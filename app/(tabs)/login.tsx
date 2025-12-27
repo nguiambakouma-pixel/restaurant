@@ -16,13 +16,30 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    const { error } = await signIn(email, password);
-    setLoading(false);
-
-    if (error) {
-      Alert.alert('Erreur de connexion', error.message);
-    } else {
-      router.replace('/');
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        console.error('Erreur de connexion:', error);
+        Alert.alert('Erreur de connexion', error.message || 'Identifiants incorrects');
+      } else {
+        // Connexion réussie
+        Alert.alert(
+          'Bienvenue !',
+          'Vous êtes maintenant connecté',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/')
+            }
+          ]
+        );
+      }
+    } catch (err: any) {
+      console.error('Erreur:', err);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la connexion');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -47,6 +64,7 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
+              autoCorrect={false}
             />
           </View>
 
@@ -59,6 +77,7 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCorrect={false}
             />
           </View>
 
@@ -81,7 +100,7 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() => router.push('./register')}
+            onPress={() => router.push('/register')}
             activeOpacity={0.8}
           >
             <Text style={styles.secondaryButtonText}>Créer un compte</Text>

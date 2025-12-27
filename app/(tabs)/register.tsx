@@ -28,22 +28,30 @@ export default function RegisterScreen() {
     }
 
     setLoading(true);
-    const { error } = await signUp(email, password, fullName);
-    setLoading(false);
-
-    if (error) {
-      Alert.alert('Erreur d\'inscription', error.message);
-    } else {
-      Alert.alert(
-        'Inscription réussie !',
-        'Bienvenue chez Bistro Moderne ! Vous pouvez maintenant commander.',
-        [
-          {
-            text: 'Commencer',
-            onPress: () => router.replace('/')
-          }
-        ]
-      );
+    try {
+      const { error } = await signUp(email, password, fullName);
+      
+      if (error) {
+        console.error('Erreur inscription:', error);
+        Alert.alert('Erreur d\'inscription', error.message || 'Impossible de créer le compte');
+      } else {
+        // Inscription réussie
+        Alert.alert(
+          '🎉 Inscription réussie !',
+          `Bienvenue chez Bistro Moderne, ${fullName} !\n\nVous pouvez maintenant passer des commandes et ajouter des plats en favoris.`,
+          [
+            {
+              text: 'Commencer',
+              onPress: () => router.replace('/')
+            }
+          ]
+        );
+      }
+    } catch (err: any) {
+      console.error('Erreur:', err);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'inscription');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,6 +81,7 @@ export default function RegisterScreen() {
                 placeholderTextColor="#666"
                 value={fullName}
                 onChangeText={setFullName}
+                autoCorrect={false}
               />
             </View>
 
@@ -86,6 +95,7 @@ export default function RegisterScreen() {
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
+                autoCorrect={false}
               />
             </View>
 
@@ -98,6 +108,7 @@ export default function RegisterScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                autoCorrect={false}
               />
               <Text style={styles.hint}>Au moins 6 caractères</Text>
             </View>
@@ -111,6 +122,7 @@ export default function RegisterScreen() {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
+                autoCorrect={false}
               />
             </View>
 

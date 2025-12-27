@@ -1,9 +1,42 @@
 import { router } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 export default function ProfileScreen() {
   const { user, signOut, loading } = useAuth();
+  const { getFavoritesCount } = useFavorites();
+  const { getTotalItems } = useCart();
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalSpent: 0,
+  });
+
+  useEffect(() => {
+    if (user) {
+      loadUserStats();
+    }
+  }, [user]);
+
+  const loadUserStats = async () => {
+    try {
+      // Charger les vraies stats depuis Supabase
+      const { default: ordersService } = await import('../services/orderService');
+      const { total_orders, total_spent } = await ordersService.getUserOrderStats(user!.id);
+      setStats({
+        totalOrders: total_orders,
+        totalSpent: total_spent,
+      });
+    } catch (error) {
+      console.error('Erreur chargement stats:', error);
+      setStats({
+        totalOrders: 0,
+        totalSpent: 0,
+      });
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -23,6 +56,15 @@ export default function ProfileScreen() {
     );
   };
 
+  const getInitials = (name: string) => {
+    if (!name) return '?';
+    const words = name.trim().split(' ');
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase();
+    }
+    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -30,26 +72,47 @@ export default function ProfileScreen() {
           <Text style={styles.headerTitle}>Mon Profil</Text>
         </View>
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#ff6b35" />
           <Text style={styles.loadingText}>Chargement...</Text>
         </View>
       </View>
     );
   }
 
-  // Si l'utilisateur n'est pas connecté
+  // Si l'utilisateur n'est pas connecté (MODE INVITÉ)
   if (!user) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Mon Profil</Text>
+        {/* Header simple pour invité */}
+        <View style={styles.headerGuest}>
+          <View style={styles.guestBadge}>
+            <Text style={styles.guestBadgeIcon}>👤</Text>
+          </View>
+          <Text style={styles.headerTitle}>Mode Invité</Text>
+          <Text style={styles.headerSubtitle}>Connectez-vous pour plus de fonctionnalités</Text>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Stats invité */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statIcon}>🛒</Text>
+              <Text style={styles.statValue}>{getTotalItems()}</Text>
+              <Text style={styles.statLabel}>Articles au panier</Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statIcon}>🍽️</Text>
+              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statLabel}>Commandes</Text>
+            </View>
+          </View>
+
+          {/* Message invité */}
           <View style={styles.guestContainer}>
-            <Text style={styles.guestEmoji}>👤</Text>
-            <Text style={styles.guestTitle}>Vous n'êtes pas connecté</Text>
+            <Text style={styles.guestTitle}>Créez votre compte</Text>
             <Text style={styles.guestText}>
-              Créez un compte pour sauvegarder vos informations et suivre vos commandes
+              Profitez de tous les avantages : favoris, historique, livraison et plus encore !
             </Text>
 
             <TouchableOpacity
@@ -69,27 +132,28 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Fonctionnalités disponibles */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Fonctionnalités disponibles</Text>
-            <View style={styles.featureCard}>
-              <Text style={styles.featureIcon}>📦</Text>
-              <View style={styles.featureInfo}>
-                <Text style={styles.featureTitle}>Historique des commandes</Text>
-                <Text style={styles.featureDesc}>Suivez toutes vos commandes</Text>
-              </View>
-            </View>
+            <Text style={styles.sectionTitle}>Avec un compte</Text>
             <View style={styles.featureCard}>
               <Text style={styles.featureIcon}>❤️</Text>
               <View style={styles.featureInfo}>
                 <Text style={styles.featureTitle}>Plats favoris</Text>
-                <Text style={styles.featureDesc}>Enregistrez vos plats préférés</Text>
+                <Text style={styles.featureDesc}>Sauvegardez vos plats préférés</Text>
               </View>
             </View>
             <View style={styles.featureCard}>
-              <Text style={styles.featureIcon}>⭐</Text>
+              <Text style={styles.featureIcon}>📦</Text>
               <View style={styles.featureInfo}>
-                <Text style={styles.featureTitle}>Avis et notes</Text>
-                <Text style={styles.featureDesc}>Partagez votre expérience</Text>
+                <Text style={styles.featureTitle}>Livraison à domicile</Text>
+                <Text style={styles.featureDesc}>Commandez et faites-vous livrer</Text>
+              </View>
+            </View>
+            <View style={styles.featureCard}>
+              <Text style={styles.featureIcon}>📋</Text>
+              <View style={styles.featureInfo}>
+                <Text style={styles.featureTitle}>Historique des commandes</Text>
+                <Text style={styles.featureDesc}>Suivez toutes vos commandes</Text>
               </View>
             </View>
           </View>
@@ -98,58 +162,111 @@ export default function ProfileScreen() {
     );
   }
 
-  // Si l'utilisateur est connecté
+  // Si l'utilisateur est connecté (DASHBOARD)
+  const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
+  const userInitials = getInitials(userName);
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mon Profil</Text>
+      {/* Header utilisateur connecté */}
+      <View style={styles.headerConnected}>
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{userInitials}</Text>
+          </View>
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{userName}</Text>
+            <Text style={styles.userEmail}>{user.email}</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Carte utilisateur */}
-        <View style={styles.userCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user.email?.charAt(0).toUpperCase()}
-            </Text>
+        {/* Stats utilisateur */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Text style={styles.statIcon}>❤️</Text>
+            <Text style={styles.statValue}>{getFavoritesCount()}</Text>
+            <Text style={styles.statLabel}>Favoris</Text>
           </View>
-          <Text style={styles.userName}>
-            {user.user_metadata?.full_name || 'Utilisateur'}
-          </Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
+          
+          <View style={styles.statCard}>
+            <Text style={styles.statIcon}>📦</Text>
+            <Text style={styles.statValue}>{stats.totalOrders}</Text>
+            <Text style={styles.statLabel}>Commandes</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Text style={styles.statIcon}>🛒</Text>
+            <Text style={styles.statValue}>{getTotalItems()}</Text>
+            <Text style={styles.statLabel}>Au panier</Text>
+          </View>
         </View>
 
-        {/* Menu options */}
+        {/* Accès rapide */}
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Accès rapide</Text>
+          
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité arrive bientôt !')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.menuIcon}>📦</Text>
-            <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>Mes commandes</Text>
-              <Text style={styles.menuDesc}>Historique et suivi</Text>
-            </View>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité arrive bientôt !')}
+            onPress={() => router.push('./favorites')}
             activeOpacity={0.8}
           >
             <Text style={styles.menuIcon}>❤️</Text>
             <View style={styles.menuInfo}>
               <Text style={styles.menuTitle}>Mes favoris</Text>
-              <Text style={styles.menuDesc}>Plats sauvegardés</Text>
+              <Text style={styles.menuDesc}>{getFavoritesCount()} plat(s) sauvegardé(s)</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité arrive bientôt !')}
+            onPress={() => router.push('/orders')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuIcon}>📦</Text>
+            <View style={styles.menuInfo}>
+              <Text style={styles.menuTitle}>Mes commandes</Text>
+              <Text style={styles.menuDesc}>{stats.totalOrders} commande(s)</Text>
+            </View>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/cart')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuIcon}>🛒</Text>
+            <View style={styles.menuInfo}>
+              <Text style={styles.menuTitle}>Mon panier</Text>
+              <Text style={styles.menuDesc}>{getTotalItems()} article(s)</Text>
+            </View>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Paramètres */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Compte</Text>
+          
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/edit-profile')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuIcon}>👤</Text>
+            <View style={styles.menuInfo}>
+              <Text style={styles.menuTitle}>Informations personnelles</Text>
+              <Text style={styles.menuDesc}>Nom, email, téléphone</Text>
+            </View>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => Alert.alert('Bientôt disponible', 'La gestion des adresses arrive bientôt !')}
             activeOpacity={0.8}
           >
             <Text style={styles.menuIcon}>📍</Text>
@@ -162,7 +279,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité arrive bientôt !')}
+            onPress={() => Alert.alert('Bientôt disponible', 'Les paramètres arrivent bientôt !')}
             activeOpacity={0.8}
           >
             <Text style={styles.menuIcon}>⚙️</Text>
@@ -179,7 +296,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Aide</Text>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => Alert.alert('Support', 'Contactez-nous : support@bistromoderne.com')}
+            onPress={() => Alert.alert('Support', 'Contactez-nous :\nsupport@bistromoderne.com\n+237 6 XX XX XX XX')}
             activeOpacity={0.8}
           >
             <Text style={styles.menuIcon}>💬</Text>
@@ -192,7 +309,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => Alert.alert('À propos', 'Bistro Moderne v1.0\nDéveloppé avec ❤️')}
+            onPress={() => Alert.alert('À propos', 'Bistro Moderne v1.0\nDéveloppé avec ❤️ au Cameroun')}
             activeOpacity={0.8}
           >
             <Text style={styles.menuIcon}>ℹ️</Text>
@@ -238,10 +355,82 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  headerTitle: {
+  headerGuest: {
+    backgroundColor: '#2d2d2d',
+    paddingTop: 50,
+    paddingBottom: 30,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  guestBadge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  guestBadgeIcon: {
+    fontSize: 40,
+  },
+  headerConnected: {
+    backgroundColor: '#2d2d2d',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  avatarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#ff6b35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  avatarText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#ff6b35',
+    color: 'white',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#ccc',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginTop: 10,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#ccc',
+    marginTop: 5,
   },
   loadingContainer: {
     flex: 1,
@@ -251,30 +440,59 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#ccc',
     fontSize: 16,
+    marginTop: 10,
   },
   content: {
     flex: 1,
   },
+  statsContainer: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#2d2d2d',
+    padding: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  statIcon: {
+    fontSize: 30,
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ff6b35',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+  },
   guestContainer: {
-    padding: 40,
+    padding: 30,
     alignItems: 'center',
   },
-  guestEmoji: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
   guestTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: 'white',
     marginBottom: 10,
     textAlign: 'center',
   },
   guestText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#ccc',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 25,
     lineHeight: 22,
   },
   primaryButton: {
@@ -284,7 +502,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     width: '100%',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 12,
     elevation: 3,
     shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 2 },
@@ -311,80 +529,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  userCard: {
-    backgroundColor: '#2d2d2d',
-    margin: 20,
-    padding: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#ff6b35',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  avatarText: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#ccc',
-  },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 25,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   menuItem: {
     backgroundColor: '#2d2d2d',
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
+    padding: 16,
     borderRadius: 12,
     marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   menuIcon: {
     fontSize: 24,
     marginRight: 15,
+    width: 30,
+    textAlign: 'center',
   },
   menuInfo: {
     flex: 1,
   },
   menuTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: 'white',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   menuDesc: {
     fontSize: 13,
     color: '#999',
   },
   menuArrow: {
-    fontSize: 24,
+    fontSize: 28,
     color: '#666',
+    fontWeight: '300',
   },
   featureCard: {
     backgroundColor: '#2d2d2d',
@@ -405,7 +595,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   featureDesc: {
     fontSize: 13,
@@ -416,6 +606,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 10,
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   logoutButtonText: {
     color: '#ff6b35',

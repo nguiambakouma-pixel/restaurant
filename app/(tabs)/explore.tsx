@@ -1,56 +1,113 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useCart } from '../context/CartContext';
+import { supabase } from '../lib/supabase';
+
+interface Product {
+  id: string;
+  category_id: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string | null;
+  is_available: boolean;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  emoji: string | null;
+  display_order: number;
+}
 
 export default function MenuScreen() {
-  const [selectedCategory, setSelectedCategory] = useState('entrees');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchText, setSearchText] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const { addToCart, getTotalItems, getTotalPrice } = useCart();
 
-  // Données locales temporaires (tu ajouteras les vraies dans Supabase plus tard)
-  const menuItems = {
-    entrees: [
-      { id: 1, name: 'Salade César', price: 2500, desc: 'Salade croquante, parmesan, croûtons', image: require('../../assets/images/salade.jpeg') },
-      { id: 2, name: 'Carpaccio de Bœuf', price: 3000, desc: 'Lamelles de bœuf, roquette, parmesan', image: require('../../assets/images/hero.jpeg') },
-      { id: 3, name: 'Velouté du jour', price: 1800, desc: 'Soupe crémeuse selon la saison', image: require('../../assets/images/burger.jpeg') }
-    ],
-    plats: [
-      { id: 4, name: 'Burger Signature', price: 3500, desc: 'Pain artisanal, bœuf angus, légumes frais', image: require('../../assets/images/burger.jpeg') },
-      { id: 5, name: 'Saumon Grillé', price: 4500, desc: 'Filet de saumon, légumes de saison', image: require('../../assets/images/salade.jpeg') },
-      { id: 6, name: 'Risotto aux Champignons', price: 3800, desc: 'Riz crémeux, champignons frais', image: require('../../assets/images/dessert.jpeg') }
-    ],
-    desserts: [
-      { id: 7, name: 'Tiramisu', price: 1800, desc: 'Mascarpone, café, cacao', image: require('../../assets/images/dessert.jpeg') },
-      { id: 8, name: 'Tarte Tatin', price: 2000, desc: 'Pommes caramélisées, pâte croustillante', image: require('../../assets/images/hero.jpeg') },
-      { id: 9, name: 'Mousse au Chocolat', price: 1500, desc: 'Chocolat noir 70%, chantilly', image: require('../../assets/images/burger.jpeg') }
-    ],
-    boissons: [
-      { id: 10, name: 'Café Espresso', price: 800, desc: 'Café italien corsé', image: require('../../assets/images/salade.jpeg') },
-      { id: 11, name: 'Thé Earl Grey', price: 700, desc: 'Thé noir bergamote', image: require('../../assets/images/dessert.jpeg') },
-      { id: 12, name: 'Jus d\'Orange', price: 1000, desc: 'Pressé à la demande', image: require('../../assets/images/hero.jpeg') }
-    ]
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // Charger les catégories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('display_order');
+
+      if (categoriesError) throw categoriesError;
+      setCategories(categoriesData || []);
+
+      // Sélectionner la première catégorie par défaut
+      if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
+        setSelectedCategory(categoriesData[0].id);
+      }
+
+      // Charger tous les produits
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_available', true)
+        .order('name');
+
+      if (productsError) throw productsError;
+      setProducts(productsData || []);
+
+    } catch (error) {
+      console.error('Erreur chargement données:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const categories = [
-    { id: 'entrees', name: 'Entrées', emoji: '🥗' },
-    { id: 'plats', name: 'Plats', emoji: '🍖' },
-    { id: 'desserts', name: 'Desserts', emoji: '🍰' },
-    { id: 'boissons', name: 'Boissons', emoji: '🍷' }
-  ];
-
-  const handleAddToCart = (item: any) => {
+  const handleAddToCart = (item: Product) => {
     addToCart({
-      id: item.id,
+      id: parseInt(item.id),
       name: item.name,
       price: item.price,
-      image: item.image,
+      image: item.image_url 
+        ? { uri: item.image_url }
+        : require('../../assets/images/hero.jpeg'),
     });
   };
 
-  const filteredItems = menuItems[selectedCategory as keyof typeof menuItems].filter(item =>
-    item.name.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const handleProductPress = (productId: string) => {
+    router.push(`../product/${productId}`);
+  };
+
+  // Filtrer les produits
+  const filteredItems = products.filter(item => {
+    const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
+    const matchesSearch = !searchText || 
+      item.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchText.toLowerCase());
+    
+    return matchesCategory && matchesSearch;
+  });
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Notre Menu</Text>
+          <Text style={styles.headerSubtitle}>Chargement...</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#ff6b35" />
+          <Text style={styles.loadingText}>Chargement du menu...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -77,9 +134,31 @@ export default function MenuScreen() {
           value={searchText}
           onChangeText={setSearchText}
         />
+        {searchText.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchText('')}>
+            <Text style={styles.clearSearch}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryTabs}>
+        <TouchableOpacity
+          style={[
+            styles.categoryTab,
+            !selectedCategory && styles.activeTab
+          ]}
+          onPress={() => setSelectedCategory('')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.categoryEmoji}>🍽️</Text>
+          <Text style={[
+            styles.categoryName,
+            !selectedCategory && styles.activeCategoryName
+          ]}>
+            Tout
+          </Text>
+        </TouchableOpacity>
+
         {categories.map(category => (
           <TouchableOpacity
             key={category.id}
@@ -90,7 +169,7 @@ export default function MenuScreen() {
             onPress={() => setSelectedCategory(category.id)}
             activeOpacity={0.8}
           >
-            <Text style={styles.categoryEmoji}>{category.emoji}</Text>
+            <Text style={styles.categoryEmoji}>{category.emoji || '🍴'}</Text>
             <Text style={[
               styles.categoryName,
               selectedCategory === category.id && styles.activeCategoryName
@@ -106,17 +185,31 @@ export default function MenuScreen() {
           <TouchableOpacity 
             key={item.id} 
             style={styles.menuItem}
+            onPress={() => handleProductPress(item.id)}
             activeOpacity={0.9}
           >
-            <Image source={item.image} style={styles.itemImage} />
+            <Image 
+              source={
+                item.image_url 
+                  ? { uri: item.image_url }
+                  : require('../../assets/images/hero.jpeg')
+              }
+              style={styles.itemImage}
+              defaultSource={require('../../assets/images/hero.jpeg')}
+            />
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemDesc}>{item.desc}</Text>
+              <Text style={styles.itemDesc} numberOfLines={2}>
+                {item.description || 'Délicieux plat préparé avec soin'}
+              </Text>
               <View style={styles.itemFooter}>
                 <Text style={styles.itemPrice}>{item.price.toFixed(0)} FCFA</Text>
                 <TouchableOpacity 
                   style={styles.addButton}
-                  onPress={() => handleAddToCart(item)}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleAddToCart(item);
+                  }}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.addButtonText}>+</Text>
@@ -128,9 +221,18 @@ export default function MenuScreen() {
         
         {filteredItems.length === 0 && (
           <View style={styles.noResults}>
+            <Text style={styles.noResultsEmoji}>😕</Text>
             <Text style={styles.noResultsText}>Aucun plat trouvé</Text>
+            <Text style={styles.noResultsSubtext}>
+              {searchText 
+                ? 'Essayez avec un autre terme de recherche'
+                : 'Aucun plat disponible dans cette catégorie'
+              }
+            </Text>
           </View>
         )}
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {getTotalItems() > 0 && (
@@ -152,6 +254,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#ccc',
+    marginTop: 10,
+    fontSize: 16,
   },
   header: {
     backgroundColor: '#2d2d2d',
@@ -220,6 +332,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
   },
+  clearSearch: {
+    color: '#999',
+    fontSize: 20,
+    padding: 5,
+  },
   categoryTabs: {
     maxHeight: 80,
     paddingHorizontal: 10,
@@ -263,7 +380,6 @@ const styles = StyleSheet.create({
   menuList: {
     flex: 1,
     padding: 20,
-    paddingBottom: 100,
   },
   menuItem: {
     backgroundColor: '#2d2d2d',
@@ -331,9 +447,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 40,
   },
+  noResultsEmoji: {
+    fontSize: 60,
+    marginBottom: 15,
+  },
   noResultsText: {
-    color: '#ccc',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  noResultsSubtext: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
   },
   floatingCartButton: {
     position: 'absolute',

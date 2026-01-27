@@ -1,11 +1,14 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { supabase } from '../lib/supabase';
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { user, signOut, loading } = useAuth();
   const { getFavoritesCount } = useFavorites();
   const { getTotalItems } = useCart();
@@ -13,12 +16,33 @@ export default function ProfileScreen() {
     totalOrders: 0,
     totalSpent: 0,
   });
+  const [isAdmin, setIsAdmin] = useState(false);
+
 
   useEffect(() => {
     if (user) {
       loadUserStats();
+      checkAdminStatus();
     }
   }, [user]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('role')
+        .eq('id', user!.id)
+        .single();
+
+      if (data && !error) {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+    } catch (e) {
+      setIsAdmin(false);
+    }
+  };
 
   const loadUserStats = async () => {
     try {
@@ -68,7 +92,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <Text style={styles.headerTitle}>Mon Profil</Text>
         </View>
         <View style={styles.loadingContainer}>
@@ -84,7 +108,7 @@ export default function ProfileScreen() {
     return (
       <View style={styles.container}>
         {/* Header simple pour invité */}
-        <View style={styles.headerGuest}>
+        <View style={[styles.headerGuest, { paddingTop: insets.top + 10 }]}>
           <View style={styles.guestBadge}>
             <Text style={styles.guestBadgeIcon}>👤</Text>
           </View>
@@ -100,7 +124,7 @@ export default function ProfileScreen() {
               <Text style={styles.statValue}>{getTotalItems()}</Text>
               <Text style={styles.statLabel}>Articles au panier</Text>
             </View>
-            
+
             <View style={styles.statCard}>
               <Text style={styles.statIcon}>🍽️</Text>
               <Text style={styles.statValue}>0</Text>
@@ -169,7 +193,7 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       {/* Header utilisateur connecté */}
-      <View style={styles.headerConnected}>
+      <View style={[styles.headerConnected, { paddingTop: insets.top + 10 }]}>
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{userInitials}</Text>
@@ -189,13 +213,13 @@ export default function ProfileScreen() {
             <Text style={styles.statValue}>{getFavoritesCount()}</Text>
             <Text style={styles.statLabel}>Favoris</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Text style={styles.statIcon}>📦</Text>
             <Text style={styles.statValue}>{stats.totalOrders}</Text>
             <Text style={styles.statLabel}>Commandes</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Text style={styles.statIcon}>🛒</Text>
             <Text style={styles.statValue}>{getTotalItems()}</Text>
@@ -206,7 +230,7 @@ export default function ProfileScreen() {
         {/* Accès rapide */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Accès rapide</Text>
-          
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => router.push('./favorites')}
@@ -250,7 +274,7 @@ export default function ProfileScreen() {
         {/* Paramètres */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Compte</Text>
-          
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => router.push('/edit-profile')}
@@ -320,6 +344,29 @@ export default function ProfileScreen() {
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
         </View>
+        {/* ============ AJOUTEZ CE CODE ICI ============ */}
+
+        {/* Section Admin - Visible seulement pour les admins */}
+        {/* Section Admin - Visible seulement pour les admins */}
+        {user && isAdmin && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Administration</Text>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => router.push('/admin')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.menuIcon}>⚙️</Text>
+              <View style={styles.menuInfo}>
+                <Text style={styles.menuTitle}>Dashboard Admin</Text>
+                <Text style={styles.menuDesc}>Accès administrateur</Text>
+              </View>
+              <Text style={styles.menuArrow}>›</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ============ FIN DU CODE À AJOUTER ============ */}
 
         {/* Bouton déconnexion */}
         <View style={styles.section}>
@@ -345,7 +392,6 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#2d2d2d',
-    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -357,7 +403,6 @@ const styles = StyleSheet.create({
   },
   headerGuest: {
     backgroundColor: '#2d2d2d',
-    paddingTop: 50,
     paddingBottom: 30,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -381,7 +426,6 @@ const styles = StyleSheet.create({
   },
   headerConnected: {
     backgroundColor: '#2d2d2d',
-    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
     elevation: 4,

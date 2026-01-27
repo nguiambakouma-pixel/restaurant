@@ -1,13 +1,16 @@
+// app/(tabs)/cart.tsx - VERSION CORRIGÉE AVEC FCFA ET BOUTON RETOUR
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackButton } from '../../components/ui/BackButton';
 import { useCart } from '../context/CartContext';
 
 export default function CartScreen() {
+  const insets = useSafeAreaInsets();
   const { cartItems, updateQuantity, removeFromCart, getTotalPrice, clearCart, cartVersion } = useCart();
   const [forceRender, setForceRender] = useState(0);
 
-  // Force le re-render quand cartVersion change
   useEffect(() => {
     console.log('CartScreen: cartVersion a change =', cartVersion);
     setForceRender(prev => prev + 1);
@@ -18,24 +21,23 @@ export default function CartScreen() {
       Alert.alert('Panier vide', 'Ajoutez des articles avant de commander !');
       return;
     }
-    
-    // Redirige vers l'ecran de checkout
+
     router.push('/checkout');
   };
 
   const handleClearCart = () => {
     Alert.alert(
-      'Vider le panier ?', 
-      'Etes-vous sur de vouloir supprimer tous les articles ?',
+      'Vider le panier ?',
+      'Êtes-vous sûr de vouloir supprimer tous les articles ?',
       [
         { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Oui, vider', 
+        {
+          text: 'Oui, vider',
           onPress: () => {
             clearCart();
             setForceRender(prev => prev + 1);
-          }, 
-          style: 'destructive' 
+          },
+          style: 'destructive'
         }
       ]
     );
@@ -45,19 +47,25 @@ export default function CartScreen() {
   if (cartItems.length === 0) {
     return (
       <View style={styles.container} key={`empty-v${cartVersion}-r${forceRender}`}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Mon Panier</Text>
-          <Text style={styles.headerSubtitle}>Vos plats selectionnes</Text>
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+          <BackButton style={styles.backButton} />
+
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Mon Panier</Text>
+            <Text style={styles.headerSubtitle}>Vos plats sélectionnés</Text>
+          </View>
+
+          <View style={styles.headerSpacer} />
         </View>
-        
+
         <View style={styles.emptyCart}>
           <Text style={styles.emptyEmoji}>🛒</Text>
           <Text style={styles.emptyTitle}>Votre panier est vide</Text>
-          <Text style={styles.emptyText}>Parcourez notre menu pour ajouter des plats delicieux !</Text>
-          
-          <TouchableOpacity 
+          <Text style={styles.emptyText}>Parcourez notre menu pour ajouter des plats délicieux !</Text>
+
+          <TouchableOpacity
             style={styles.goToMenuButton}
-            onPress={() => router.replace('/explore')}
+            onPress={() => router.push('/explore')}
             activeOpacity={0.8}
           >
             <Text style={styles.goToMenuButtonText}>Voir le Menu</Text>
@@ -70,22 +78,28 @@ export default function CartScreen() {
   // Vue panier avec articles
   return (
     <View style={styles.container} key={`filled-v${cartVersion}-r${forceRender}`}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mon Panier</Text>
-        <Text style={styles.headerSubtitle}>{cartItems.length} article(s)</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <BackButton style={styles.backButton} />
+
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Mon Panier</Text>
+          <Text style={styles.headerSubtitle}>{cartItems.length} article(s)</Text>
+        </View>
+
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.cartList}>
         {cartItems.map(item => (
           <View key={item.id} style={styles.cartItem}>
             <Image source={item.image} style={styles.itemImage} />
-            
+
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemPrice}>{item.price.toFixed(0)} FCFA / unite</Text>
-              
+              <Text style={styles.itemPrice}>{item.price.toFixed(0)} FCFA / unité</Text>
+
               <View style={styles.quantityControls}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.quantityButton}
                   onPress={() => {
                     updateQuantity(item.id, item.quantity - 1);
@@ -95,10 +109,10 @@ export default function CartScreen() {
                 >
                   <Text style={styles.quantityButtonText}>-</Text>
                 </TouchableOpacity>
-                
+
                 <Text style={styles.quantityText}>{item.quantity}</Text>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.quantityButton}
                   onPress={() => {
                     updateQuantity(item.id, item.quantity + 1);
@@ -113,9 +127,9 @@ export default function CartScreen() {
 
             <View style={styles.itemActions}>
               <Text style={styles.itemTotal}>
-                {(item.price * item.quantity).toFixed(2)} euros
+                {(item.price * item.quantity).toFixed(0)} FCFA
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.removeButton}
                 onPress={() => {
                   removeFromCart(item.id);
@@ -133,20 +147,20 @@ export default function CartScreen() {
       <View style={styles.footer}>
         <View style={styles.totalSection}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalPrice}>{getTotalPrice().toFixed(2)} euros</Text>
+          <Text style={styles.totalPrice}>{getTotalPrice().toFixed(0)} FCFA</Text>
         </View>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.checkoutButton}
           onPress={handleCheckout}
           activeOpacity={0.8}
         >
           <Text style={styles.checkoutButtonText}>
-            Commander maintenant - {getTotalPrice().toFixed(2)} euros
+            Commander maintenant - {getTotalPrice().toFixed(0)} FCFA
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.clearButton}
           onPress={handleClearCart}
           activeOpacity={0.8}
@@ -165,18 +179,30 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#2d2d2d',
-    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
+    flexDirection: 'row',
     alignItems: 'center',
     elevation: 4,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+  },
+  backButton: {
+    marginLeft: 0,
+    marginRight: 15,
+  },
+  backButtonText: {
+    display: 'none',
+  },
+  headerContent: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerSpacer: {
+    width: 40,
+    marginLeft: 15,
   },
   headerTitle: {
     fontSize: 24,
@@ -218,10 +244,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     elevation: 3,
     shadowColor: '#ff6b35',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
@@ -242,10 +265,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
@@ -282,10 +302,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 2,
     shadowColor: '#ff6b35',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 2,
   },
@@ -322,10 +339,7 @@ const styles = StyleSheet.create({
     padding: 20,
     elevation: 4,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
@@ -353,10 +367,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     elevation: 4,
     shadowColor: '#ff6b35',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },

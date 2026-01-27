@@ -1,10 +1,13 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackButton } from '../../components/ui/BackButton';
 import { useAuth } from '../context/AuthContext';
 import ordersService, { OrderWithItems } from '../services/orderService';
 
 export default function OrdersScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +94,7 @@ export default function OrdersScreen() {
             try {
               const { success, error } = await ordersService.cancelOrder(orderId);
               if (error) throw error;
-              
+
               Alert.alert('Succès', 'Commande annulée');
               loadOrders();
             } catch (error) {
@@ -107,13 +110,7 @@ export default function OrdersScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
+          <BackButton style={styles.backButton} />
           <Text style={styles.headerTitle}>Mes Commandes</Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -141,13 +138,7 @@ export default function OrdersScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
+          <BackButton style={styles.backButton} />
           <Text style={styles.headerTitle}>Mes Commandes</Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -163,13 +154,7 @@ export default function OrdersScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
+          <BackButton style={styles.backButton} />
           <Text style={styles.headerTitle}>Mes Commandes</Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -195,14 +180,8 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <BackButton style={styles.backButton} />
         <Text style={styles.headerTitle}>Mes Commandes</Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -340,7 +319,6 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#2d2d2d',
-    paddingTop: 50,
     paddingBottom: 15,
     paddingHorizontal: 20,
     flexDirection: 'row',
@@ -353,17 +331,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#444',
+    // Styles gérés par le composant
   },
   backButtonText: {
-    fontSize: 24,
-    color: '#ff6b35',
-    fontWeight: 'bold',
+    display: 'none',
   },
   headerTitle: {
     fontSize: 18,

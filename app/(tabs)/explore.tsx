@@ -29,6 +29,7 @@ export default function MenuScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToCart, getTotalItems, getTotalPrice } = useCart();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadData();
@@ -74,7 +75,7 @@ export default function MenuScreen() {
       id: parseInt(item.id),
       name: item.name,
       price: item.price,
-      image: item.image_url 
+      image: item.image_url
         ? { uri: item.image_url }
         : require('../../assets/images/hero.jpeg'),
     });
@@ -87,10 +88,10 @@ export default function MenuScreen() {
   // Filtrer les produits
   const filteredItems = products.filter(item => {
     const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
-    const matchesSearch = !searchText || 
+    const matchesSearch = !searchText ||
       item.name.toLowerCase().includes(searchText.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchText.toLowerCase());
-    
+
     return matchesCategory && matchesSearch;
   });
 
@@ -113,9 +114,11 @@ export default function MenuScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notre Menu</Text>
-        <Text style={styles.headerSubtitle}>Tous nos plats préparés avec amour</Text>
+        <Text style={styles.headerSubtitle}>
+          Pour vous, <Text style={{ color: '#fff', fontWeight: 'bold' }}>{(user?.user_metadata?.full_name || 'Gourmet').split(' ')[0]}</Text> ✨
+        </Text>
         {getTotalItems() > 0 && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.cartBadge}
             onPress={() => router.push('/cart')}
             activeOpacity={0.8}
@@ -182,15 +185,15 @@ export default function MenuScreen() {
 
       <ScrollView style={styles.menuList} showsVerticalScrollIndicator={false}>
         {filteredItems.map(item => (
-          <TouchableOpacity 
-            key={item.id} 
+          <TouchableOpacity
+            key={item.id}
             style={styles.menuItem}
             onPress={() => handleProductPress(item.id)}
             activeOpacity={0.9}
           >
-            <Image 
+            <Image
               source={
-                item.image_url 
+                item.image_url
                   ? { uri: item.image_url }
                   : require('../../assets/images/hero.jpeg')
               }
@@ -204,7 +207,7 @@ export default function MenuScreen() {
               </Text>
               <View style={styles.itemFooter}>
                 <Text style={styles.itemPrice}>{item.price.toFixed(0)} FCFA</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.addButton}
                   onPress={(e) => {
                     e.stopPropagation();
@@ -218,13 +221,13 @@ export default function MenuScreen() {
             </View>
           </TouchableOpacity>
         ))}
-        
+
         {filteredItems.length === 0 && (
           <View style={styles.noResults}>
             <Text style={styles.noResultsEmoji}>😕</Text>
             <Text style={styles.noResultsText}>Aucun plat trouvé</Text>
             <Text style={styles.noResultsSubtext}>
-              {searchText 
+              {searchText
                 ? 'Essayez avec un autre terme de recherche'
                 : 'Aucun plat disponible dans cette catégorie'
               }
@@ -236,7 +239,7 @@ export default function MenuScreen() {
       </ScrollView>
 
       {getTotalItems() > 0 && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.floatingCartButton}
           onPress={() => router.push('/cart')}
           activeOpacity={0.8}

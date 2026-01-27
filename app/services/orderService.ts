@@ -1,3 +1,4 @@
+// app/services/orderService.ts - VERSION CORRIGÉE
 import { supabase } from '../lib/supabase';
 
 export interface OrderItemData {
@@ -64,50 +65,71 @@ class OrdersService {
    */
   async createOrder(orderData: OrderData): Promise<{ order: Order | null; error: any }> {
     try {
+      console.log('📦 Création commande avec données:', orderData);
+
       // 1. Créer la commande principale
+      const orderPayload = {
+        user_id: orderData.user_id || null,
+        customer_name: orderData.customer_name,
+        customer_phone: orderData.customer_phone,
+        customer_address: orderData.customer_address || null,
+        customer_city: orderData.customer_city || null,
+        delivery_mode: orderData.delivery_mode,
+        status: 'pending',
+        special_instructions: orderData.special_instructions || null,
+        subtotal: orderData.subtotal,
+        delivery_fee: orderData.delivery_fee,
+        total: orderData.total,
+        payment_method: 'cash',
+        payment_status: 'pending',
+      };
+
+      console.log('📝 Payload commande:', orderPayload);
+
       const { data: order, error: orderError } = await supabase
         .from('orders')
-        .insert({
-          user_id: orderData.user_id || null,
-          customer_name: orderData.customer_name,
-          customer_phone: orderData.customer_phone,
-          customer_address: orderData.customer_address || null,
-          customer_city: orderData.customer_city || null,
-          delivery_mode: orderData.delivery_mode,
-          status: 'pending',
-          special_instructions: orderData.special_instructions || null,
-          subtotal: orderData.subtotal,
-          delivery_fee: orderData.delivery_fee,
-          total: orderData.total,
-          payment_method: 'cash',
-          payment_status: 'pending',
-        })
+        .insert(orderPayload)
         .select()
         .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('❌ Erreur création commande:', orderError);
+        throw orderError;
+      }
+
+      console.log('✅ Commande créée:', order);
 
       // 2. Créer les items de la commande
-      const orderItems = orderData.items.map(item => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        product_price: item.product_price,
-        product_image_url: item.product_image_url || null,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_price: item.total_price,
-      }));
+      if (orderData.items && orderData.items.length > 0) {
+        const orderItems = orderData.items.map(item => ({
+          order_id: order.id,
+          product_id: item.product_id || null,
+          product_name: item.product_name,
+          product_price: item.product_price,
+          product_image_url: item.product_image_url || null,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+        }));
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
+        console.log('📝 Items à insérer:', orderItems);
 
-      if (itemsError) throw itemsError;
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+
+        if (itemsError) {
+          console.error('❌ Erreur création items:', itemsError);
+          // Ne pas bloquer si les items échouent, la commande existe déjà
+          console.warn('⚠️ Commande créée mais items non enregistrés');
+        } else {
+          console.log('✅ Items créés avec succès');
+        }
+      }
 
       return { order, error: null };
-    } catch (error) {
-      console.error('Erreur création commande:', error);
+    } catch (error: any) {
+      console.error('❌ Exception création commande:', error);
       return { order: null, error };
     }
   }

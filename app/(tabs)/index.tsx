@@ -1,6 +1,20 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { supabase } from '../lib/supabase';
 
@@ -12,19 +26,32 @@ interface Product {
   description: string;
   price: number;
   image_url: string | null;
+  category_id: string;
   rating_avg: number;
   rating_count: number;
 }
 
-export default function TabOneScreen() {
+interface Category {
+  id: string;
+  name: string;
+  emoji: string | null;
+}
+
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const { addToCart, getTotalItems } = useCart();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [popularItems, setPopularItems] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
-  // Images du carousel
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Hero Carousel State
+  const [currentIndex, setCurrentIndex] = useState(0);
   const heroImages = [
     require('../../assets/images/hero.jpeg'),
     require('../../assets/images/burger.jpeg'),
@@ -33,16 +60,23 @@ export default function TabOneScreen() {
   ];
 
   const heroTexts = [
-    { title: 'Bienvenue', subtitle: 'Découvrez nos plats préparés avec passion' },
-    { title: 'Nos Burgers', subtitle: 'Fraîcheur et saveurs authentiques' },
-    { title: 'Salades Fraîches', subtitle: 'Ingrédients sélectionnés avec soin' },
-    { title: 'Desserts Maison', subtitle: 'Le plaisir sucré en fin de repas' },
+    { title: 'Bienvenue', subtitle: 'L\'excellence culinaire à votre portée' },
+    { title: 'Nos Burgers', subtitle: 'Des créations uniques et savoureuses' },
+    { title: 'Végétal', subtitle: 'Fraîcheur et équilibre dans l\'assiette' },
+    { title: 'Douceurs', subtitle: 'Pour finir sur une note parfaite' },
   ];
 
   useEffect(() => {
-    loadPopularItems();
+    loadInitialData();
+    startAnimation();
 
-    // Animation d'entrée
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % heroImages.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const startAnimation = () => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -55,38 +89,49 @@ export default function TabOneScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+  };
 
-    // Auto-défilement du carousel
-    const interval = setInterval(() => {
-      setCurrentIndex((prevIndex) => (prevIndex + 1) % heroImages.length);
-    }, 6000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadPopularItems = async () => {
+  const loadInitialData = async () => {
     try {
       setLoading(true);
-      
-      // Charger les produits les mieux notés
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_available', true)
-        .order('rating_avg', { ascending: false })
-        .order('rating_count', { ascending: false })
-        .limit(3);
-
-      if (error) throw error;
-      
-      if (data && data.length > 0) {
-        setPopularItems(data);
-      }
+      await Promise.all([fetchCategories(), fetchProducts()]);
     } catch (error) {
-      console.error('Erreur chargement plats populaires:', error);
+      console.error('Erreur chargement:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchCategories = async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('*')
+      .order('display_order');
+    if (data) setCategories(data);
+  };
+
+  const fetchProducts = async () => {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_available', true)
+      .order('name');
+    if (data) setProducts(data);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadInitialData();
+    setRefreshing(false);
+  };
+
+  const getFilteredProducts = () => {
+    if (selectedCategory === 'all') return products;
+    return products.filter(p => p.category_id === selectedCategory);
+  };
+
+  const handleProductPress = (productId: string) => {
+    router.push(`../product/${productId}`);
   };
 
   const handleAddToCart = (item: Product) => {
@@ -94,200 +139,159 @@ export default function TabOneScreen() {
       id: parseInt(item.id),
       name: item.name,
       price: item.price,
-      image: item.image_url 
-        ? { uri: item.image_url }
-        : require('../../assets/images/hero.jpeg'),
+      image: item.image_url ? { uri: item.image_url } : require('../../assets/images/hero.jpeg'),
     });
-  };
-
-  const handleProductPress = (productId: string) => {
-    router.push(`../product/${productId}`);
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>🍽️ Bistro Moderne</Text>
-        <Text style={styles.headerSubtitle}>Saveurs authentiques</Text>
+      <StatusBar barStyle="light-content" />
+
+      {/* Header Flottant */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View>
+          <Text style={styles.headerTitle}>
+            Salut <Text style={{ color: '#fff' }}>{(user?.user_metadata?.full_name || 'Gourmet').split(' ')[0]}</Text> 👋
+          </Text>
+          <Text style={styles.headerSubtitle}>Qu'est-ce qui vous ferait plaisir ?</Text>
+        </View>
         {getTotalItems() > 0 && (
-          <TouchableOpacity 
-            style={styles.cartBadge}
+          <TouchableOpacity
+            style={styles.cartBtn}
             onPress={() => router.push('/cart')}
-            activeOpacity={0.8}
           >
-            <Text style={styles.cartBadgeText}>{getTotalItems()}</Text>
+            <Text style={styles.cartCount}>{getTotalItems()}</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Hero Carousel dynamique */}
-        <Animated.View 
-          style={[
-            styles.heroContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <View style={styles.hero}>
-            <Image 
-              source={heroImages[currentIndex]} 
-              style={styles.heroImage}
-            />
-            <View style={styles.heroOverlay}>
-              <Text style={styles.heroTitle}>{heroTexts[currentIndex].title}</Text>
-              <Text style={styles.heroText}>{heroTexts[currentIndex].subtitle}</Text>
-              <TouchableOpacity 
-                style={styles.heroButton}
-                onPress={() => router.push('/explore')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.heroButtonText}>Voir le Menu</Text>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#ff6b35" />}
+      >
+        {/* Hero Section */}
+        <Animated.View style={[styles.heroContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <Image source={heroImages[currentIndex]} style={styles.heroImage} />
+          <View style={styles.heroOverlay}>
+            <View style={styles.heroContent}>
+              <Animated.Text style={styles.heroTitle}>{heroTexts[currentIndex].title}</Animated.Text>
+              <Text style={styles.heroSubtitle}>{heroTexts[currentIndex].subtitle}</Text>
+              <TouchableOpacity style={styles.exploreBtn} onPress={() => router.push('/explore')}>
+                <Text style={styles.exploreBtnText}>Explorer le menu ✨</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Indicateurs du carousel */}
-          <View style={styles.carouselIndicators}>
-            {heroImages.map((_, index) => (
+          <View style={styles.indicators}>
+            {heroImages.map((_, idx) => (
               <View
-                key={index}
-                style={[
-                  styles.indicator,
-                  { opacity: currentIndex === index ? 1 : 0.4 }
-                ]}
+                key={idx}
+                style={[styles.dot, currentIndex === idx && styles.activeDot]}
               />
             ))}
           </View>
         </Animated.View>
 
-        {/* Categories avec animations */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nos Spécialités</Text>
-          <View style={styles.categoryGrid}>
-            {[
-              { emoji: '🥗', text: 'Entrées' },
-              { emoji: '🍖', text: 'Plats' },
-              { emoji: '🍰', text: 'Desserts' },
-              { emoji: '🍷', text: 'Boissons' }
-            ].map((category, index) => (
-              <Animated.View
-                key={index}
+        {/* Categories Horizontal Menu */}
+        <View style={styles.categorySection}>
+          <Text style={styles.sectionTitle}>Découvrir</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryList}
+          >
+            <TouchableOpacity
+              style={[
+                styles.categoryChip,
+                selectedCategory === 'all' && styles.activeCategoryChip
+              ]}
+              onPress={() => setSelectedCategory('all')}
+            >
+              <Text style={[styles.categoryText, selectedCategory === 'all' && styles.activeCategoryText]}>
+                Tout
+              </Text>
+            </TouchableOpacity>
+
+            {categories.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
                 style={[
-                  styles.categoryCard,
-                  {
-                    opacity: fadeAnim,
-                    transform: [{
-                      translateY: Animated.add(slideAnim, new Animated.Value(index * 10))
-                    }]
-                  }
+                  styles.categoryChip,
+                  selectedCategory === cat.id && styles.activeCategoryChip
                 ]}
+                onPress={() => setSelectedCategory(cat.id)}
               >
-                <TouchableOpacity 
-                  style={styles.categoryCardInner}
-                  onPress={() => router.push('/explore')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-                  <Text style={styles.categoryText}>{category.text}</Text>
-                </TouchableOpacity>
-              </Animated.View>
+                <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+                <Text style={[styles.categoryText, selectedCategory === cat.id && styles.activeCategoryText]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
         </View>
 
-        {/* Plats populaires */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Plats Populaires</Text>
-            {popularItems.length > 0 && (
-              <TouchableOpacity onPress={() => router.push('/explore')}>
-                <Text style={styles.seeAllText}>Tout voir →</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          
+        {/* Nos Spécialités (Grid) */}
+        <View style={styles.specialtiesSection}>
+          <Text style={styles.sectionTitle}>Nos Spécialités</Text>
+
           {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#ff6b35" />
-            </View>
-          ) : popularItems.length > 0 ? (
-            popularItems.map((item, index) => (
-              <Animated.View
-                key={item.id}
-                style={[
-                  styles.foodCard,
-                  {
-                    opacity: fadeAnim,
-                    transform: [{ 
-                      translateY: Animated.add(slideAnim, new Animated.Value(index * 5)) 
-                    }]
-                  }
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={() => handleProductPress(item.id)}
-                  activeOpacity={0.9}
-                  style={styles.foodCardTouchable}
-                >
-                  <Image 
-                    source={
-                      item.image_url 
-                        ? { uri: item.image_url }
-                        : require('../../assets/images/hero.jpeg')
-                    }
-                    style={styles.foodImage}
-                    defaultSource={require('../../assets/images/hero.jpeg')}
-                  />
-                  <View style={styles.foodInfo}>
-                    <Text style={styles.foodName}>{item.name}</Text>
-                    <Text style={styles.foodDesc} numberOfLines={2}>
-                      {item.description || 'Délicieux plat préparé avec soin'}
-                    </Text>
-                    {item.rating_count > 0 && (
-                      <View style={styles.ratingContainer}>
-                        <Text style={styles.ratingStar}>⭐</Text>
-                        <Text style={styles.ratingText}>
-                          {item.rating_avg.toFixed(1)} ({item.rating_count})
-                        </Text>
-                      </View>
-                    )}
-                    <Text style={styles.foodPrice}>{item.price.toFixed(0)} FCFA</Text>
-                  </View>
-                  <View style={styles.foodAction}>
-                    <TouchableOpacity 
-                      style={styles.addButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleAddToCart(item);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.addButtonText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            ))
+            <ActivityIndicator size="large" color="#ff6b35" style={{ marginTop: 20 }} />
           ) : (
-            <Text style={styles.noItemsText}>Aucun plat disponible pour le moment</Text>
+            <View style={styles.grid}>
+              {getFilteredProducts().map((item, index) => (
+                <Animated.View
+                  key={item.id}
+                  style={[
+                    styles.cardContainer,
+                    {
+                      opacity: fadeAnim,
+                      transform: [{ translateY: Animated.add(slideAnim, new Animated.Value(index * 10)) }]
+                    }
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.card}
+                    onPress={() => handleProductPress(item.id)}
+                    activeOpacity={0.9}
+                  >
+                    <View style={styles.imageWrapper}>
+                      <Image
+                        source={item.image_url ? { uri: item.image_url } : require('../../assets/images/hero.jpeg')}
+                        style={styles.cardImage}
+                      />
+                      <View style={styles.priceTag}>
+                        <Text style={styles.priceText}>{item.price} FCFA</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.cardContent}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
+
+                      <View style={styles.cardFooter}>
+                        {item.rating_count > 0 ? (
+                          <View style={styles.rating}>
+                            <Text style={styles.star}>⭐</Text>
+                            <Text style={styles.ratingVal}>{item.rating_avg.toFixed(1)}</Text>
+                          </View>
+                        ) : <View />}
+
+                        <TouchableOpacity style={styles.addBtn} onPress={() => handleAddToCart(item)}>
+                          <Text style={styles.addBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </View>
+          )}
+
+          {!loading && getFilteredProducts().length === 0 && (
+            <Text style={styles.emptyText}>Aucun plat trouvé dans cette catégorie.</Text>
           )}
         </View>
-
-        {/* Bouton vers le menu complet */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.fullMenuButton}
-            onPress={() => router.push('/explore')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.fullMenuButtonText}>🍽️ Voir tout le menu</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -296,68 +300,59 @@ export default function TabOneScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#121212',
   },
   header: {
-    backgroundColor: '#2d2d2d',
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    position: 'relative',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: 'rgba(18, 18, 18, 0.95)',
+    zIndex: 10,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
     color: '#ff6b35',
-    marginBottom: 5,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#ccc',
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '500',
   },
-  cartBadge: {
-    position: 'absolute',
-    top: 15,
-    right: 20,
+  cartBtn: {
     backgroundColor: '#ff6b35',
-    borderRadius: 15,
-    minWidth: 30,
-    height: 30,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    elevation: 8,
     shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-  },
-  cartBadgeText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  content: {
-    flex: 1,
-  },
-  heroContainer: {
-    margin: 20,
-  },
-  hero: {
-    position: 'relative',
-    height: 220,
-    borderRadius: 15,
-    overflow: 'hidden',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowRadius: 8,
+  },
+  cartCount: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+
+  // Hero
+  heroContainer: {
+    height: 280,
+    margin: 20,
+    marginBottom: 30,
+    borderRadius: 24,
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
   },
   heroImage: {
     width: '100%',
@@ -365,211 +360,203 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   heroOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)', // Darken image slightly
+    justifyContent: 'flex-end',
+    padding: 25,
+  },
+  heroContent: {
+    marginBottom: 20,
   },
   heroTitle: {
-    fontSize: 30,
+    color: '#fff',
+    fontSize: 32,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 10,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  heroText: {
+  heroSubtitle: {
+    color: '#eee',
     fontSize: 16,
-    color: 'white',
-    textAlign: 'center',
     marginBottom: 20,
     opacity: 0.9,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
   },
-  heroButton: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
+  exploreBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     borderRadius: 30,
-    elevation: 4,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    backdropFilter: 'blur(10px)', // For web, native uses View
   },
-  heroButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 18,
+  exploreBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
-  carouselIndicators: {
+  indicators: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 15,
+    gap: 8,
   },
-  indicator: {
+  dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+  },
+  activeDot: {
     backgroundColor: '#ff6b35',
-    marginHorizontal: 4,
+    width: 24,
   },
-  section: {
-    padding: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
+
+  // Categories
+  categorySection: {
+    marginBottom: 30,
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#fff',
+    marginLeft: 20,
+    marginBottom: 15,
   },
-  seeAllText: {
-    color: '#ff6b35',
-    fontSize: 14,
+  categoryList: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#252525',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: '#333',
+    gap: 8,
+  },
+  activeCategoryChip: {
+    backgroundColor: '#ff6b35',
+    borderColor: '#ff6b35',
+    transform: [{ scale: 1.05 }],
+  },
+  categoryEmoji: {
+    fontSize: 18,
+  },
+  categoryText: {
+    color: '#888',
     fontWeight: '600',
+    fontSize: 14,
   },
-  categoryGrid: {
+  activeCategoryText: {
+    color: '#fff',
+  },
+
+  // Grid
+  specialtiesSection: {
+    paddingHorizontal: 20,
+  },
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  categoryCard: {
-    width: '48%',
-    marginBottom: 15,
+  cardContainer: {
+    width: (width - 55) / 2, // 2 columns with spacing
+    marginBottom: 20,
   },
-  categoryCardInner: {
-    backgroundColor: '#2d2d2d',
-    padding: 20,
-    borderRadius: 15,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-  },
-  categoryEmoji: {
-    fontSize: 35,
-    marginBottom: 10,
-  },
-  categoryText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  foodCard: {
-    marginBottom: 15,
-  },
-  foodCardTouchable: {
-    backgroundColor: '#2d2d2d',
-    flexDirection: 'row',
-    borderRadius: 15,
+  card: {
+    backgroundColor: '#252525',
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 4,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
-  foodImage: {
-    width: 90,
-    height: 90,
+  imageWrapper: {
+    height: 140,
+    position: 'relative',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
     resizeMode: 'cover',
   },
-  foodInfo: {
-    flex: 1,
-    padding: 15,
-    justifyContent: 'center',
+  priceTag: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backdropFilter: 'blur(5px)',
   },
-  foodName: {
-    fontSize: 18,
+  priceText: {
+    color: '#ff6b35',
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
+    fontSize: 13,
   },
-  foodDesc: {
-    fontSize: 14,
-    color: '#ccc',
-    marginBottom: 8,
-    lineHeight: 18,
+  cardContent: {
+    padding: 12,
   },
-  ratingContainer: {
+  cardTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  cardDesc: {
+    color: '#888',
+    fontSize: 12,
+    marginBottom: 12,
+    height: 32,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rating: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    gap: 4,
   },
-  ratingStar: {
+  star: {
     fontSize: 12,
   },
-  ratingText: {
+  ratingVal: {
     color: '#ccc',
     fontSize: 12,
-    marginLeft: 4,
+    fontWeight: '600',
   },
-  foodPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ff6b35',
-  },
-  foodAction: {
-    justifyContent: 'center',
-    paddingHorizontal: 15,
-  },
-  addButton: {
+  addBtn: {
     backgroundColor: '#ff6b35',
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
   },
-  addButtonText: {
-    color: 'white',
-    fontSize: 24,
+  addBtnText: {
+    color: '#fff',
+    fontSize: 20,
     fontWeight: 'bold',
+    marginTop: -2,
   },
-  noItemsText: {
-    color: '#999',
-    fontSize: 15,
+  emptyText: {
+    color: '#888',
     textAlign: 'center',
+    marginTop: 20,
     fontStyle: 'italic',
-    paddingVertical: 30,
-  },
-  fullMenuButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#ff6b35',
-    paddingVertical: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  fullMenuButtonText: {
-    color: '#ff6b35',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 });

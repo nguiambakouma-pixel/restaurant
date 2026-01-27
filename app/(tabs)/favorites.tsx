@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
 
 export default function FavoritesScreen() {
+  const insets = useSafeAreaInsets();
   const { favorites, loading, clearFavorites, toggleFavorite } = useFavorites();
   const { addToCart } = useCart();
 
@@ -95,7 +97,7 @@ export default function FavoritesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.headerContent}>
           <View>
             <Text style={styles.headerTitle}>Mes Favoris</Text>
@@ -180,8 +182,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#2d2d2d',
-    paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 15,
     paddingHorizontal: 20,
     elevation: 4,
     shadowColor: '#000',

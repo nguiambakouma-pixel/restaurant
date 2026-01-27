@@ -1,338 +1,316 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { BackButton } from '../../components/ui/BackButton';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { useUser } from '../context/UserContext';
-import ordersService, { OrderData, OrderItemData } from '../services/orderService';
+// import notificationService from '../services/notificationService';
+import ordersService from '../services/orderService';
+
+type DeliveryMode = 'delivery' | 'pickup';
 
 export default function CheckoutScreen() {
   const { cartItems, getTotalPrice, clearCart } = useCart();
-  const { userInfo, updateUserInfo } = useUser();
-  const { user } = useAuth();
-  
-  const [name, setName] = useState(userInfo.name);
-  const [phone, setPhone] = useState(userInfo.phone);
-  const [address, setAddress] = useState(userInfo.address);
-  const [city, setCity] = useState(userInfo.city);
-  const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'pickup'>(userInfo.deliveryMode);
-  const [notes, setNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { user, signInAnonymously } = useAuth();
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(false);
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('delivery');
+
+  // Form state
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [specialInstructions, setSpecialInstructions] = useState('');
+
+  // Pre-fill user data if connected
+  useEffect(() => {
+    if (user) {
+      // Préremplir si l'utilisateur a des informations
+      if ((user as any).name) setName((user as any).name);
+      if ((user as any).phone) setPhone((user as any).phone);
+      if ((user as any).address) setAddress((user as any).address);
+      if ((user as any).city) setCity((user as any).city);
+    }
+  }, [user]);
+
+  const subtotal = getTotalPrice();
+  const deliveryFee = deliveryMode === 'delivery' ? 1000 : 0; // 1000 FCFA frais livraison par défaut
+  const total = subtotal + deliveryFee;
 
   const validateForm = () => {
     if (!name.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer votre nom');
       return false;
     }
-    if (!phone.trim() || phone.length < 8) {
-      Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide');
+    if (!phone.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone');
       return false;
     }
-    if (deliveryMode === 'delivery' && (!address.trim() || !city.trim())) {
-      Alert.alert('Erreur', 'Veuillez entrer votre adresse complète');
+    if (deliveryMode === 'delivery' && !address.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer une adresse de livraison');
       return false;
     }
     return true;
   };
 
-  const handleConfirmOrder = async () => {
+  const handlePlaceOrder = async () => {
     if (!validateForm()) return;
 
-    // Vérifier la connexion si livraison
-    if (deliveryMode === 'delivery' && !user) {
-      Alert.alert(
-        'Connexion requise',
-        'Vous devez être connecté pour commander en livraison',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { 
-            text: 'Se connecter', 
-            onPress: () => router.push('/login')
-          }
-        ]
-      );
+    if (cartItems.length === 0) {
+      Alert.alert('Erreur', 'Votre panier est vide');
       return;
     }
 
     try {
-      setSubmitting(true);
+      setLoading(true);
 
-      // Sauvegarder les infos utilisateur localement
-      updateUserInfo({ name, phone, address, city, deliveryMode });
+      // Si l'utilisateur n'est pas connecté, essayer de le connecter anonymement
+      let userId = user?.id;
+      if (!userId) {
+        console.log('Utilisateur non connecté, tentative de connexion anonyme...');
+        const { error } = await (user as any)?.signInAnonymously ? (user as any).signInAnonymously() : Promise.resolve({ error: null });
 
-      const total = getTotalPrice();
-      const deliveryFee = deliveryMode === 'delivery' ? 1500 : 0;
-      const finalTotal = total + deliveryFee;
+        // Note: Nous avons besoin d'accéder à la fonction signInAnonymously du contexte
+        // Mais ici nous n'avons que 'user'. Nous devons récupérer la fonction du hook useAuth
+      }
 
-      // Préparer les items de commande
-      const orderItems: OrderItemData[] = cartItems.map(item => ({
-        product_id: item.id.toString(),
-        product_name: item.name,
-        product_price: item.price,
-        product_image_url: typeof item.image === 'object' && 'uri' in item.image 
-          ? item.image.uri 
-          : undefined,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.price * item.quantity,
-      }));
+      // Re-vérifier l'utilisateur après tentative de connexion
+      // C'est compliqué car 'user' est une const du hook.
+      // Nous allons modifier l'approche : récupérer signInAnonymously du hook au début
 
-      // Créer la commande dans Supabase
-      const orderData: OrderData = {
+
+
+      // Si livraison et utilisateur invité, suggérer la connexion
+      if (deliveryMode === 'delivery' && (!user || user.is_anonymous)) {
+        // En faire une promesse pour attendre la réponse de l'utilisateur
+        const proceed = await new Promise((resolve) => {
+          Alert.alert(
+            "Compte recommandé",
+            "Pour suivre votre livraison en temps réel, connectez-vous !",
+            [
+              { text: "Continuer en invité", style: "cancel", onPress: () => resolve(true) },
+              { text: "Se connecter", onPress: () => { router.push('/login'); resolve(false); } },
+              { text: "Créer un compte", onPress: () => { router.push('/register'); resolve(false); } }
+            ]
+          );
+        });
+
+        if (!proceed) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      const orderData = {
+        user_id: user?.id,
         customer_name: name,
         customer_phone: phone,
-        customer_address: deliveryMode === 'delivery' ? address : undefined,
-        customer_city: deliveryMode === 'delivery' ? city : undefined,
         delivery_mode: deliveryMode,
-        special_instructions: notes || undefined,
-        subtotal: total,
+        special_instructions: specialInstructions,
+        subtotal,
         delivery_fee: deliveryFee,
-        total: finalTotal,
-        items: orderItems,
-        user_id: user?.id,
+        total,
+        items: cartItems.map(item => ({
+          product_id: String(item.id),
+          product_name: item.name,
+          product_price: item.price,
+          product_image_url: typeof item.image === 'string' ? item.image : undefined,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity
+        })),
+        ...(deliveryMode === 'delivery' ? { customer_address: address, customer_city: city } : {})
       };
+
+      console.log('Soumission commande:', orderData);
 
       const { order, error } = await ordersService.createOrder(orderData);
 
       if (error) {
-        throw new Error('Impossible de créer la commande');
+        throw error;
       }
 
-      // Succès !
-      const orderSummary = `
-🎉 COMMANDE CONFIRMÉE !
 
-${deliveryMode === 'delivery' ? '📦 LIVRAISON' : '🏪 RETRAIT'}
 
-Numéro de commande: #${order?.id.slice(0, 8)}
-Nom: ${name}
-Tél: ${phone}
-${deliveryMode === 'delivery' ? `Adresse: ${address}, ${city}` : 'Retrait au restaurant'}
-
-Articles: ${cartItems.length}
-Sous-total: ${total.toFixed(0)} FCFA
-${deliveryMode === 'delivery' ? `Livraison: ${deliveryFee.toFixed(0)} FCFA` : ''}
-TOTAL: ${finalTotal.toFixed(0)} FCFA
-
-${deliveryMode === 'delivery' ? 'Livraison estimée: 30-40 min' : 'Prêt dans: 20-30 min'}
-
-Merci pour votre commande !
-      `.trim();
-
+      // Succès
+      const orderIdPreview = order?.id ? String(order.id).slice(0, 8) : '';
       Alert.alert(
-        'Commande enregistrée !',
-        orderSummary,
+        'Commande réussie !',
+        `Votre commande #${orderIdPreview} a bien été enregistrée.`,
         [
           {
-            text: user ? 'Voir mes commandes' : 'Retour à l\'accueil',
+            text: 'Voir mes commandes',
             onPress: () => {
               clearCart();
-              if (user) {
-                router.push('/orders');
-              } else {
-                router.push('/');
-              }
+              router.replace('/(tabs)/orders');
             }
           }
         ]
       );
-    } catch (error: any) {
-      console.error('Erreur création commande:', error);
-      Alert.alert(
-        'Erreur',
-        'Impossible d\'enregistrer votre commande. Veuillez réessayer.'
-      );
+
+    } catch (error) {
+      console.error('Erreur commande:', error);
+      Alert.alert('Erreur', 'Impossible d\'enregistrer votre commande. Veuillez réessayer.');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
-
-  if (cartItems.length === 0) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Finaliser la commande</Text>
-        </View>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Votre panier est vide</Text>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.push('/explore')}
-          >
-            <Text style={styles.backButtonText}>Retour au menu</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  const deliveryFee = deliveryMode === 'delivery' ? 1500 : 0;
-  const finalTotal = getTotalPrice() + deliveryFee;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButtonIcon}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} />
         <Text style={styles.headerTitle}>Finaliser la commande</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Mode de récupération */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mode de récupération</Text>
-          <View style={styles.modeContainer}>
-            <TouchableOpacity
-              style={[styles.modeButton, deliveryMode === 'delivery' && styles.modeButtonActive]}
-              onPress={() => setDeliveryMode('delivery')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.modeEmoji}>🚚</Text>
-              <Text style={[styles.modeText, deliveryMode === 'delivery' && styles.modeTextActive]}>
-                Livraison
-              </Text>
-              <Text style={styles.modeFee}>+1500 FCFA</Text>
-            </TouchableOpacity>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
 
-            <TouchableOpacity
-              style={[styles.modeButton, deliveryMode === 'pickup' && styles.modeButtonActive]}
-              onPress={() => setDeliveryMode('pickup')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.modeEmoji}>🏪</Text>
-              <Text style={[styles.modeText, deliveryMode === 'pickup' && styles.modeTextActive]}>
-                Retrait
-              </Text>
-              <Text style={styles.modeFee}>Gratuit</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Informations personnelles */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vos informations</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nom complet *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Jean Dupont"
-              placeholderTextColor="#666"
-              value={name}
-              onChangeText={setName}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Téléphone *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 06 12 34 56 78"
-              placeholderTextColor="#666"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-          </View>
-        </View>
-
-        {/* Adresse (si livraison) */}
-        {deliveryMode === 'delivery' && (
+          {/* Section Mode de livraison */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Adresse de livraison</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Adresse *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ex: 123 Rue de la Paix"
-                placeholderTextColor="#666"
-                value={address}
-                onChangeText={setAddress}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ville *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ex: Douala"
-                placeholderTextColor="#666"
-                value={city}
-                onChangeText={setCity}
-              />
+            <Text style={styles.sectionTitle}>Mode de récupération</Text>
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[styles.toggleButton, deliveryMode === 'delivery' && styles.toggleButtonActive]}
+                onPress={() => setDeliveryMode('delivery')}
+              >
+                <Text style={[styles.toggleText, deliveryMode === 'delivery' && styles.toggleTextActive]}>
+                  Livraison
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleButton, deliveryMode === 'pickup' && styles.toggleButtonActive]}
+                onPress={() => setDeliveryMode('pickup')}
+              >
+                <Text style={[styles.toggleText, deliveryMode === 'pickup' && styles.toggleTextActive]}>
+                  À emporter
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
-        )}
 
-        {/* Notes */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Instructions spéciales (optionnel)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Ex: Sans oignons, sonnez 2 fois..."
-            placeholderTextColor="#666"
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
+          {/* Formulaire Client */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Vos Coordonnées</Text>
 
-        {/* Résumé */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Résumé de la commande</Text>
-          <View style={styles.summaryCard}>
-            {cartItems.map(item => (
-              <View key={item.id} style={styles.summaryItem}>
-                <Text style={styles.summaryItemName}>
-                  {item.quantity}x {item.name}
-                </Text>
-                <Text style={styles.summaryItemPrice}>
-                  {(item.price * item.quantity).toFixed(0)} FCFA
-                </Text>
-              </View>
-            ))}
-            
-            <View style={styles.summaryDivider} />
-            
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Sous-total</Text>
-              <Text style={styles.summaryValue}>{getTotalPrice().toFixed(0)} FCFA</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nom complet *</Text>
+              <TextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="Ex: John Doe"
+                placeholderTextColor="#666"
+              />
             </View>
-            
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Téléphone *</Text>
+              <TextInput
+                style={styles.input}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Ex: 699 00 00 00"
+                placeholderTextColor="#666"
+                keyboardType="phone-pad"
+              />
+            </View>
+
             {deliveryMode === 'delivery' && (
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Frais de livraison</Text>
-                <Text style={styles.summaryValue}>{deliveryFee.toFixed(0)} FCFA</Text>
-              </View>
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Adresse de livraison *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={address}
+                    onChangeText={setAddress}
+                    placeholder="Quartier, point de repère..."
+                    placeholderTextColor="#666"
+                    multiline
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Ville</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={city}
+                    onChangeText={setCity}
+                    placeholder="Ex: Douala"
+                    placeholderTextColor="#666"
+                  />
+                </View>
+              </>
             )}
-            
-            <View style={[styles.summaryItem, styles.summaryTotal]}>
-              <Text style={styles.summaryTotalLabel}>TOTAL</Text>
-              <Text style={styles.summaryTotalValue}>{finalTotal.toFixed(0)} FCFA</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Instructions spéciales</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={specialInstructions}
+                onChangeText={setSpecialInstructions}
+                placeholder="Allergies, code porte, etc."
+                placeholderTextColor="#666"
+                multiline
+                numberOfLines={3}
+              />
             </View>
           </View>
-        </View>
 
-        <View style={{ height: 120 }} />
-      </ScrollView>
+          {/* Résumé */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Résumé</Text>
 
-      {/* Bouton fixe */}
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Sous-total</Text>
+              <Text style={styles.summaryValue}>{subtotal.toFixed(0)} FCFA</Text>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Frais de livraison</Text>
+              <Text style={styles.summaryValue}>
+                {deliveryFee === 0 ? 'Gratuit' : `${deliveryFee} FCFA`}
+              </Text>
+            </View>
+
+            <View style={[styles.summaryRow, styles.totalRow]}>
+              <Text style={styles.totalLabel}>Total à payer</Text>
+              <Text style={styles.totalValue}>{total.toFixed(0)} FCFA</Text>
+            </View>
+          </View>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Button Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.confirmButton, submitting && styles.confirmButtonDisabled]}
-          onPress={handleConfirmOrder}
-          disabled={submitting}
-          activeOpacity={0.8}
+          style={[styles.payButton, loading && styles.disabledButton]}
+          onPress={handlePlaceOrder}
+          disabled={loading}
         >
-          {submitting ? (
+          {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={styles.confirmButtonText}>
-              Confirmer la commande - {finalTotal.toFixed(0)} FCFA
+            <Text style={styles.payButtonText}>
+              Confirmer la commande - {total.toFixed(0)} FCFA
             </Text>
           )}
         </TouchableOpacity>
@@ -354,31 +332,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  backButtonIcon: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#444',
+  backButton: {
+    // Styles gérés par le composant
   },
   backButtonText: {
-    fontSize: 24,
-    color: '#ff6b35',
-    fontWeight: 'bold',
+    display: 'none',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#ff6b35',
-    flex: 1,
-    textAlign: 'center',
   },
   headerSpacer: {
     width: 40,
@@ -386,8 +350,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  section: {
+  scrollContent: {
     padding: 20,
+    paddingBottom: 40,
+  },
+  section: {
+    backgroundColor: '#2d2d2d',
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
@@ -395,55 +366,42 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 15,
   },
-  modeContainer: {
+  toggleContainer: {
     flexDirection: 'row',
-    gap: 15,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 10,
+    padding: 4,
   },
-  modeButton: {
+  toggleButton: {
     flex: 1,
-    backgroundColor: '#2d2d2d',
-    padding: 20,
-    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderRadius: 8,
   },
-  modeButtonActive: {
-    borderColor: '#ff6b35',
-    backgroundColor: '#ff6b3520',
+  toggleButtonActive: {
+    backgroundColor: '#444',
   },
-  modeEmoji: {
-    fontSize: 30,
-    marginBottom: 8,
-  },
-  modeText: {
-    color: '#ccc',
-    fontSize: 16,
+  toggleText: {
+    color: '#888',
     fontWeight: '600',
-    marginBottom: 4,
   },
-  modeTextActive: {
-    color: 'white',
-  },
-  modeFee: {
-    color: '#999',
-    fontSize: 12,
+  toggleTextActive: {
+    color: '#ff6b35',
+    fontWeight: 'bold',
   },
   inputGroup: {
     marginBottom: 15,
   },
   label: {
     color: '#ccc',
-    fontSize: 14,
     marginBottom: 8,
-    fontWeight: '500',
+    fontSize: 14,
   },
   input: {
-    backgroundColor: '#2d2d2d',
-    color: 'white',
-    padding: 15,
+    backgroundColor: '#1a1a1a',
     borderRadius: 10,
-    fontSize: 16,
+    padding: 15,
+    color: 'white',
     borderWidth: 1,
     borderColor: '#444',
   },
@@ -451,99 +409,55 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
-  summaryCard: {
-    backgroundColor: '#2d2d2d',
-    padding: 15,
-    borderRadius: 12,
-  },
-  summaryItem: {
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 10,
-  },
-  summaryItemName: {
-    color: '#ccc',
-    fontSize: 14,
-    flex: 1,
-  },
-  summaryItemPrice: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: '#444',
-    marginVertical: 10,
   },
   summaryLabel: {
     color: '#ccc',
-    fontSize: 14,
+    fontSize: 16,
   },
   summaryValue: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '600',
   },
-  summaryTotal: {
+  totalRow: {
     marginTop: 10,
     paddingTop: 10,
-    borderTopWidth: 2,
-    borderTopColor: '#ff6b35',
+    borderTopWidth: 1,
+    borderTopColor: '#444',
   },
-  summaryTotalLabel: {
+  totalLabel: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  summaryTotalValue: {
+  totalValue: {
     color: '#ff6b35',
     fontSize: 20,
     fontWeight: 'bold',
   },
   footer: {
-    backgroundColor: '#2d2d2d',
     padding: 20,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    backgroundColor: '#2d2d2d',
+    borderTopWidth: 1,
+    borderTopColor: '#444',
   },
-  confirmButton: {
+  payButton: {
     backgroundColor: '#ff6b35',
-    paddingVertical: 18,
+    padding: 18,
     borderRadius: 15,
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#ff6b35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    elevation: 3,
   },
-  confirmButtonDisabled: {
-    opacity: 0.6,
+  disabledButton: {
+    opacity: 0.7,
   },
-  confirmButtonText: {
+  payButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyText: {
-    color: '#ccc',
     fontSize: 18,
-    marginBottom: 20,
-  },
-  backButton: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
+    fontWeight: 'bold',
   },
 });

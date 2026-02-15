@@ -22,7 +22,7 @@ class UploadService {
         quality: 0.8,
       });
 
-      if (result.canceled) {
+      if (result.canceled || !result.assets || result.assets.length === 0) {
         return null;
       }
 

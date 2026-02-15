@@ -23,6 +23,7 @@ const MAPPING = {
   'heart.fill': 'favorite',
   'cart.fill': 'shopping-cart',
   'person.fill': 'person',
+  'star.fill': 'star',
 } as IconMapping;
 
 /**

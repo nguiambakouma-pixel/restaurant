@@ -1,6 +1,7 @@
 // app/context/AuthContext.tsx - VERSION CORRIGÉE
 import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 import { supabase } from '../lib/supabase';
 // Notification setup removed
 
@@ -164,7 +165,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         signOut,
       }}
     >
-      {children}
+      {loading ? <LoadingScreen /> : children}
     </AuthContext.Provider>
   );
 };

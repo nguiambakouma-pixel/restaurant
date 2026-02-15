@@ -6,8 +6,8 @@ export const notificationService = {
     sendPushNotification: async () => { },
     notifyAdminsNewOrder: async () => { },
     notifyCustomerOrderStatus: async () => { },
-    addNotificationReceivedListener: () => ({ remove: () => { } }),
-    addNotificationResponseReceivedListener: () => ({ remove: () => { } }),
+    addNotificationReceivedListener: (callback: (notification: any) => void) => ({ remove: () => { } }),
+    addNotificationResponseReceivedListener: (callback: (response: any) => void) => ({ remove: () => { } }),
 };
 
 export default notificationService;

@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import React from 'react';
 // import { NotificationHandler } from '../components/NotificationHandler';
+import '../i18n'; // Initialize i18n
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';

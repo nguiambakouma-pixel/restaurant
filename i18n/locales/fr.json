@@ -1,0 +1,256 @@
+{
+    "common": {
+        "loading": "Chargement...",
+        "error": "Une erreur est survenue",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "delete": "Supprimer",
+        "edit": "Modifier",
+        "add": "Ajouter",
+        "seeAll": "Voir tout",
+        "success": "Succès",
+        "yes": "Oui",
+        "no": "Non",
+        "ok": "OK",
+        "continue": "Continuer",
+        "back": "Retour",
+        "required": "Requis",
+        "info": "Info"
+    },
+    "tabs": {
+        "home": "Accueil",
+        "menu": "Menu",
+        "favorites": "Favoris",
+        "cart": "Panier",
+        "profile": "Profil"
+    },
+    "home": {
+        "welcome": "Bienvenue",
+        "features": {
+            "specialties": "Nos Spécialités",
+            "fineCuisine": "Cuisine Raffinée",
+            "chefPassion": "Des plats préparés avec passion par nos chefs",
+            "discoverMenu": "Découvrir le Menu"
+        },
+        "sections": {
+            "selection": "Notre Sélection",
+            "dailyMenu": "Menu du Jour",
+            "accompany": "Pour Accompagner",
+            "drinks": "Nos Boissons"
+        },
+        "cta": {
+            "wantMore": "Envie de plus ?",
+            "fullMenuDesc": "Découvrez notre menu complet avec toutes nos spécialités",
+            "exploreFull": "Explorer le Menu Complet"
+        }
+    },
+    "product": {
+        "preparation": "Préparation",
+        "calories": "Calories",
+        "rating": "Note",
+        "description": "Description",
+        "readMore": "Lire plus",
+        "seeLess": "Voir moins",
+        "ingredients": "Ingrédients",
+        "reviews": "Avis",
+        "noIngredients": "Aucun ingrédient spécifié",
+        "allergens": "Allergènes",
+        "noReviews": "Aucun avis pour le moment",
+        "beFirst": "Soyez le premier à donner votre avis !",
+        "addReview": "Ajouter un avis",
+        "quantity": "Quantité",
+        "unavailable": "Indisponible",
+        "badges": {
+            "vegetarian": "Végétarien",
+            "vegan": "Vegan",
+            "spicy": "Épicé"
+        },
+        "alerts": {
+            "addedTitle": "Ajouté au panier !",
+            "addedText": "{{quantity}} x {{name}} ajouté(s) au panier",
+            "viewCart": "Voir le panier",
+            "loginRequired": "Connexion requise",
+            "loginText": "Vous devez être connecté pour ajouter des plats en favoris",
+            "loginButton": "Se connecter",
+            "notFound": "Produit introuvable",
+            "backToMenu": "Retour au menu",
+            "loadError": "Impossible de charger les détails du produit",
+            "favoriteError": "Impossible de modifier les favoris"
+        }
+    },
+    "cart": {
+        "title": "Mon Panier",
+        "subtitle": "Vos plats sélectionnés",
+        "empty": {
+            "title": "Votre panier est vide",
+            "text": "Parcourez notre menu pour ajouter des plats délicieux !",
+            "button": "Voir le Menu"
+        },
+        "items": "article(s)",
+        "unit": "/ unité",
+        "total": "Total",
+        "checkout": "Commander maintenant",
+        "clear": "Vider le panier",
+        "alerts": {
+            "emptyTitle": "Panier vide",
+            "emptyText": "Ajoutez des articles avant de commander !",
+            "clearTitle": "Vider le panier ?",
+            "clearText": "Êtes-vous sûr de vouloir supprimer tous les articles ?",
+            "confirmClear": "Oui, vider"
+        }
+    },
+    "checkout": {
+        "title": "Finaliser la commande",
+        "deliveryMode": {
+            "title": "Mode de récupération",
+            "delivery": "Livraison",
+            "pickup": "À emporter"
+        },
+        "form": {
+            "title": "Vos Coordonnées",
+            "name": "Nom complet",
+            "phone": "Téléphone",
+            "address": "Adresse de livraison",
+            "city": "Ville",
+            "instructions": "Instructions spéciales",
+            "placeholders": {
+                "name": "Ex: John Doe",
+                "phone": "Ex: 699 00 00 00",
+                "address": "Quartier, point de repère...",
+                "city": "Ex: Douala",
+                "instructions": "Allergies, code porte, etc."
+            }
+        },
+        "summary": {
+            "title": "Résumé",
+            "subtotal": "Sous-total",
+            "deliveryFee": "Frais de livraison",
+            "free": "Gratuit",
+            "total": "Total à payer"
+        },
+        "submit": "Confirmer la commande",
+        "alerts": {
+            "errorTitle": "Erreur",
+            "missingName": "Veuillez entrer votre nom",
+            "missingPhone": "Veuillez entrer votre numéro de téléphone",
+            "missingAddress": "Veuillez entrer une adresse de livraison",
+            "emptyCart": "Votre panier est vide",
+            "guestTitle": "Compte recommandé",
+            "guestText": "Pour suivre votre livraison en temps réel, connectez-vous !",
+            "guestContinue": "Continuer en invité",
+            "guestLogin": "Se connecter",
+            "guestRegister": "Créer un compte",
+            "successTitle": "Commande réussie !",
+            "successText": "Votre commande #{{id}} a bien été enregistrée.",
+            "viewOrders": "Voir mes commandes",
+            "submitError": "Impossible d'enregistrer votre commande. Veuillez réessayer."
+        }
+    },
+    "orders": {
+        "title": "Mes Commandes",
+        "loginRequired": {
+            "title": "Connectez-vous",
+            "text": "Pour voir vos commandes, vous devez être connecté",
+            "button": "Se connecter"
+        },
+        "empty": {
+            "title": "Aucune commande",
+            "text": "Vous n'avez pas encore passé de commande",
+            "button": "Parcourir le menu"
+        },
+        "count": "commande(s)",
+        "orderNumber": "Commande #",
+        "moreItems": "autre(s) article(s)",
+        "delivery": "Livraison",
+        "pickup": "Retrait",
+        "actions": {
+            "cancel": "Annuler",
+            "reorder": "Commander à nouveau"
+        },
+        "alerts": {
+            "cancelTitle": "Annuler la commande",
+            "cancelText": "Voulez-vous vraiment annuler cette commande ?",
+            "confirmCancel": "Oui, annuler",
+            "cancelSuccess": "Commande annulée",
+            "cancelError": "Impossible d'annuler la commande",
+            "loadError": "Impossible de charger vos commandes",
+            "comingSoon": "La fonction \"Commander à nouveau\" arrive bientôt !"
+        },
+        "status": {
+            "pending": "En attente",
+            "confirmed": "Confirmée",
+            "preparing": "En préparation",
+            "ready": "Prêt",
+            "delivering": "En livraison",
+            "delivered": "Livré",
+            "completed": "Livrée",
+            "cancelled": "Annulé"
+        },
+        "details": "Détails de la commande",
+        "total": "Total",
+        "id": "Commande #"
+    },
+    "profile": {
+        "title": "Profil",
+        "language": "Langue",
+        "settings": "Paramètres",
+        "logout": "Se déconnecter",
+        "selectLanguage": "Choisir la langue",
+        "guest": {
+            "badge": "Connectez-vous pour plus de fonctionnalités",
+            "title": "Créez votre compte",
+            "text": "Profitez de tous les avantages : favoris, historique, livraison et plus encore !",
+            "login": "Se connecter",
+            "register": "Créer un compte"
+        },
+        "stats": {
+            "cart": "Articles au panier",
+            "orders": "Commandes",
+            "favorites": "Favoris",
+            "inCart": "Au panier"
+        },
+        "features": {
+            "title": "Avec un compte",
+            "favorites": {
+                "title": "Plats favoris",
+                "desc": "Sauvegardez vos plats préférés"
+            },
+            "delivery": {
+                "title": "Livraison à domicile",
+                "desc": "Commandez et faites-vous livrer"
+            },
+            "history": {
+                "title": "Historique des commandes",
+                "desc": "Suivez toutes vos commandes"
+            }
+        },
+        "menu": {
+            "quickAccess": "Accès rapide",
+            "myFavorites": "Mes favoris",
+            "savedDishes": "plat(s) sauvegardé(s)",
+            "myOrders": "Mes commandes",
+            "myCart": "Mon panier",
+            "personalInfo": "Informations personnelles",
+            "personalInfoDesc": "Nom, email, téléphone",
+            "myAddresses": "Mes adresses",
+            "addressesDesc": "Gérer les adresses de livraison",
+            "help": "Aide",
+            "support": "Support",
+            "supportDesc": "Besoin d'aide ?",
+            "about": "À propos",
+            "aboutDesc": "Version et informations",
+            "admin": "Administration",
+            "adminDashboard": "Dashboard Admin",
+            "adminDesc": "Accès administrateur"
+        },
+        "alerts": {
+            "logoutTitle": "Déconnexion",
+            "logoutText": "Êtes-vous sûr de vouloir vous déconnecter ?",
+            "logoutSuccessTitle": "À bientôt !",
+            "logoutSuccessText": "Vous avez été déconnecté avec succès",
+            "addressesComingSoon": "La gestion des adresses arrive bientôt !",
+            "supportContent": "Contactez-nous :\nsupport@bistromoderne.com\n+237 699 00 00 00",
+            "aboutContent": "Bistro Moderne v1.0\nDéveloppé avec ❤️ au Cameroun"
+        }
+    }
+}

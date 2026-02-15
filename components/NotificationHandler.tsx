@@ -6,14 +6,14 @@ export function NotificationHandler() {
     useEffect(() => {
         // Écouter les notifications reçues pendant que l'app est ouverte
         const receivedSubscription = notificationService.addNotificationReceivedListener(
-            (notification) => {
+            (notification: any) => {
                 console.log('Notification reçue:', notification);
             }
         );
 
         // Écouter les clics sur les notifications
         const responseSubscription = notificationService.addNotificationResponseReceivedListener(
-            (response) => {
+            (response: any) => {
                 const data = response.notification.request.content.data;
 
                 if (data?.type === 'new_order' && data?.orderId) {

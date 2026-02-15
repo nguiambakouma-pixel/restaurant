@@ -1,6 +1,7 @@
 // app/(tabs)/cart.tsx - VERSION CORRIGÉE AVEC FCFA ET BOUTON RETOUR
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../components/ui/BackButton';
@@ -10,6 +11,7 @@ export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const { cartItems, updateQuantity, removeFromCart, getTotalPrice, clearCart, cartVersion } = useCart();
   const [forceRender, setForceRender] = useState(0);
+  const { t } = useTranslation();
 
   useEffect(() => {
     console.log('CartScreen: cartVersion a change =', cartVersion);
@@ -18,7 +20,7 @@ export default function CartScreen() {
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
-      Alert.alert('Panier vide', 'Ajoutez des articles avant de commander !');
+      Alert.alert(t('cart.alerts.emptyTitle'), t('cart.alerts.emptyText'));
       return;
     }
 
@@ -27,12 +29,12 @@ export default function CartScreen() {
 
   const handleClearCart = () => {
     Alert.alert(
-      'Vider le panier ?',
-      'Êtes-vous sûr de vouloir supprimer tous les articles ?',
+      t('cart.alerts.clearTitle'),
+      t('cart.alerts.clearText'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Oui, vider',
+          text: t('cart.alerts.confirmClear'),
           onPress: () => {
             clearCart();
             setForceRender(prev => prev + 1);
@@ -51,8 +53,8 @@ export default function CartScreen() {
           <BackButton style={styles.backButton} />
 
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Mon Panier</Text>
-            <Text style={styles.headerSubtitle}>Vos plats sélectionnés</Text>
+            <Text style={styles.headerTitle}>{t('cart.title')}</Text>
+            <Text style={styles.headerSubtitle}>{t('cart.subtitle')}</Text>
           </View>
 
           <View style={styles.headerSpacer} />
@@ -60,15 +62,15 @@ export default function CartScreen() {
 
         <View style={styles.emptyCart}>
           <Text style={styles.emptyEmoji}>🛒</Text>
-          <Text style={styles.emptyTitle}>Votre panier est vide</Text>
-          <Text style={styles.emptyText}>Parcourez notre menu pour ajouter des plats délicieux !</Text>
+          <Text style={styles.emptyTitle}>{t('cart.empty.title')}</Text>
+          <Text style={styles.emptyText}>{t('cart.empty.text')}</Text>
 
           <TouchableOpacity
             style={styles.goToMenuButton}
             onPress={() => router.push('/explore')}
             activeOpacity={0.8}
           >
-            <Text style={styles.goToMenuButtonText}>Voir le Menu</Text>
+            <Text style={styles.goToMenuButtonText}>{t('cart.empty.button')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -82,8 +84,8 @@ export default function CartScreen() {
         <BackButton style={styles.backButton} />
 
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Mon Panier</Text>
-          <Text style={styles.headerSubtitle}>{cartItems.length} article(s)</Text>
+          <Text style={styles.headerTitle}>{t('cart.title')}</Text>
+          <Text style={styles.headerSubtitle}>{cartItems.length} {t('cart.items')}</Text>
         </View>
 
         <View style={styles.headerSpacer} />
@@ -96,7 +98,7 @@ export default function CartScreen() {
 
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemPrice}>{item.price.toFixed(0)} FCFA / unité</Text>
+              <Text style={styles.itemPrice}>{item.price.toFixed(0)} FCFA {t('cart.unit')}</Text>
 
               <View style={styles.quantityControls}>
                 <TouchableOpacity
@@ -146,7 +148,7 @@ export default function CartScreen() {
 
       <View style={styles.footer}>
         <View style={styles.totalSection}>
-          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalLabel}>{t('cart.total')}</Text>
           <Text style={styles.totalPrice}>{getTotalPrice().toFixed(0)} FCFA</Text>
         </View>
 
@@ -156,7 +158,7 @@ export default function CartScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.checkoutButtonText}>
-            Commander maintenant - {getTotalPrice().toFixed(0)} FCFA
+            {t('cart.checkout')} - {getTotalPrice().toFixed(0)} FCFA
           </Text>
         </TouchableOpacity>
 
@@ -165,7 +167,7 @@ export default function CartScreen() {
           onPress={handleClearCart}
           activeOpacity={0.8}
         >
-          <Text style={styles.clearButtonText}>Vider le panier</Text>
+          <Text style={styles.clearButtonText}>{t('cart.clear')}</Text>
         </TouchableOpacity>
       </View>
     </View>

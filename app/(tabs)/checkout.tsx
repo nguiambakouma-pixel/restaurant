@@ -1,5 +1,7 @@
+// app/(tabs)/checkout.tsx
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -15,15 +17,16 @@ import {
 import { BackButton } from '../../components/ui/BackButton';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-// import notificationService from '../services/notificationService';
+import loyaltyService, { LOYALTY_LEVELS } from '../services/loyaltyService';
 import ordersService from '../services/orderService';
 
 type DeliveryMode = 'delivery' | 'pickup';
 
 export default function CheckoutScreen() {
   const { cartItems, getTotalPrice, clearCart } = useCart();
-  const { user, signInAnonymously } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(false);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('delivery');
@@ -38,7 +41,6 @@ export default function CheckoutScreen() {
   // Pre-fill user data if connected
   useEffect(() => {
     if (user) {
-      // Préremplir si l'utilisateur a des informations
       if ((user as any).name) setName((user as any).name);
       if ((user as any).phone) setPhone((user as any).phone);
       if ((user as any).address) setAddress((user as any).address);
@@ -52,15 +54,15 @@ export default function CheckoutScreen() {
 
   const validateForm = () => {
     if (!name.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer votre nom');
+      Alert.alert(t('checkout.alerts.errorTitle'), t('checkout.alerts.missingName'));
       return false;
     }
     if (!phone.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone');
+      Alert.alert(t('checkout.alerts.errorTitle'), t('checkout.alerts.missingPhone'));
       return false;
     }
     if (deliveryMode === 'delivery' && !address.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer une adresse de livraison');
+      Alert.alert(t('checkout.alerts.errorTitle'), t('checkout.alerts.missingAddress'));
       return false;
     }
     return true;
@@ -70,40 +72,23 @@ export default function CheckoutScreen() {
     if (!validateForm()) return;
 
     if (cartItems.length === 0) {
-      Alert.alert('Erreur', 'Votre panier est vide');
+      Alert.alert(t('checkout.alerts.errorTitle'), t('checkout.alerts.emptyCart'));
       return;
     }
 
     try {
       setLoading(true);
 
-      // Si l'utilisateur n'est pas connecté, essayer de le connecter anonymement
-      let userId = user?.id;
-      if (!userId) {
-        console.log('Utilisateur non connecté, tentative de connexion anonyme...');
-        const { error } = await (user as any)?.signInAnonymously ? (user as any).signInAnonymously() : Promise.resolve({ error: null });
-
-        // Note: Nous avons besoin d'accéder à la fonction signInAnonymously du contexte
-        // Mais ici nous n'avons que 'user'. Nous devons récupérer la fonction du hook useAuth
-      }
-
-      // Re-vérifier l'utilisateur après tentative de connexion
-      // C'est compliqué car 'user' est une const du hook.
-      // Nous allons modifier l'approche : récupérer signInAnonymously du hook au début
-
-
-
       // Si livraison et utilisateur invité, suggérer la connexion
       if (deliveryMode === 'delivery' && (!user || user.is_anonymous)) {
-        // En faire une promesse pour attendre la réponse de l'utilisateur
         const proceed = await new Promise((resolve) => {
           Alert.alert(
-            "Compte recommandé",
-            "Pour suivre votre livraison en temps réel, connectez-vous !",
+            t('checkout.alerts.guestTitle'),
+            t('checkout.alerts.guestText'),
             [
-              { text: "Continuer en invité", style: "cancel", onPress: () => resolve(true) },
-              { text: "Se connecter", onPress: () => { router.push('/login'); resolve(false); } },
-              { text: "Créer un compte", onPress: () => { router.push('/register'); resolve(false); } }
+              { text: t('checkout.alerts.guestContinue'), style: "cancel", onPress: () => resolve(true) },
+              { text: t('checkout.alerts.guestLogin'), onPress: () => { router.push('/login'); resolve(false); } },
+              { text: t('checkout.alerts.guestRegister'), onPress: () => { router.push('/register'); resolve(false); } }
             ]
           );
         });
@@ -137,22 +122,43 @@ export default function CheckoutScreen() {
 
       console.log('Soumission commande:', orderData);
 
-      const { order, error } = await ordersService.createOrder(orderData);
+      const { order, error } = await ordersService.createOrder(orderData as any);
 
       if (error) {
         throw error;
       }
 
+      // 🌟 NOUVEAU: Attribution des points de fidélité
+      let loyaltyMessage = '';
+      if (user && order) {
+        try {
+          const loyaltyResult = await loyaltyService.addPointsFromOrder(
+            user.id,
+            order.id,
+            total
+          );
 
+          if (loyaltyResult.success) {
+            loyaltyMessage = `\n\n🎁 +${loyaltyResult.pointsEarned} points de fidélité !`;
+
+            if (loyaltyResult.newLevel) {
+              const newLevelData = LOYALTY_LEVELS[loyaltyResult.newLevel];
+              loyaltyMessage += `\n${newLevelData.emoji} Félicitations ! Vous êtes maintenant niveau ${newLevelData.name} !`;
+            }
+          }
+        } catch (loyaltyError) {
+          console.error('Erreur attribution points:', loyaltyError);
+        }
+      }
 
       // Succès
       const orderIdPreview = order?.id ? String(order.id).slice(0, 8) : '';
       Alert.alert(
-        'Commande réussie !',
-        `Votre commande #${orderIdPreview} a bien été enregistrée.`,
+        t('checkout.alerts.successTitle'),
+        t('checkout.alerts.successText', { id: orderIdPreview }) + loyaltyMessage,
         [
           {
-            text: 'Voir mes commandes',
+            text: t('checkout.alerts.viewOrders'),
             onPress: () => {
               clearCart();
               router.replace('/(tabs)/orders');
@@ -163,7 +169,7 @@ export default function CheckoutScreen() {
 
     } catch (error) {
       console.error('Erreur commande:', error);
-      Alert.alert('Erreur', 'Impossible d\'enregistrer votre commande. Veuillez réessayer.');
+      Alert.alert(t('checkout.alerts.errorTitle'), t('checkout.alerts.submitError'));
     } finally {
       setLoading(false);
     }
@@ -173,7 +179,7 @@ export default function CheckoutScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <BackButton style={styles.backButton} />
-        <Text style={styles.headerTitle}>Finaliser la commande</Text>
+        <Text style={styles.headerTitle}>{t('checkout.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -185,14 +191,14 @@ export default function CheckoutScreen() {
 
           {/* Section Mode de livraison */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Mode de récupération</Text>
+            <Text style={styles.sectionTitle}>{t('checkout.deliveryMode.title')}</Text>
             <View style={styles.toggleContainer}>
               <TouchableOpacity
                 style={[styles.toggleButton, deliveryMode === 'delivery' && styles.toggleButtonActive]}
                 onPress={() => setDeliveryMode('delivery')}
               >
                 <Text style={[styles.toggleText, deliveryMode === 'delivery' && styles.toggleTextActive]}>
-                  Livraison
+                  {t('checkout.deliveryMode.delivery')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -200,7 +206,7 @@ export default function CheckoutScreen() {
                 onPress={() => setDeliveryMode('pickup')}
               >
                 <Text style={[styles.toggleText, deliveryMode === 'pickup' && styles.toggleTextActive]}>
-                  À emporter
+                  {t('checkout.deliveryMode.pickup')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -208,26 +214,26 @@ export default function CheckoutScreen() {
 
           {/* Formulaire Client */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Vos Coordonnées</Text>
+            <Text style={styles.sectionTitle}>{t('checkout.form.title')}</Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nom complet *</Text>
+              <Text style={styles.label}>{t('checkout.form.name')} *</Text>
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="Ex: John Doe"
+                placeholder={t('checkout.form.placeholders.name')}
                 placeholderTextColor="#666"
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Téléphone *</Text>
+              <Text style={styles.label}>{t('checkout.form.phone')} *</Text>
               <TextInput
                 style={styles.input}
                 value={phone}
                 onChangeText={setPhone}
-                placeholder="Ex: 699 00 00 00"
+                placeholder={t('checkout.form.placeholders.phone')}
                 placeholderTextColor="#666"
                 keyboardType="phone-pad"
               />
@@ -236,24 +242,24 @@ export default function CheckoutScreen() {
             {deliveryMode === 'delivery' && (
               <>
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Adresse de livraison *</Text>
+                  <Text style={styles.label}>{t('checkout.form.address')} *</Text>
                   <TextInput
                     style={styles.input}
                     value={address}
                     onChangeText={setAddress}
-                    placeholder="Quartier, point de repère..."
+                    placeholder={t('checkout.form.placeholders.address')}
                     placeholderTextColor="#666"
                     multiline
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Ville</Text>
+                  <Text style={styles.label}>{t('checkout.form.city')}</Text>
                   <TextInput
                     style={styles.input}
                     value={city}
                     onChangeText={setCity}
-                    placeholder="Ex: Douala"
+                    placeholder={t('checkout.form.placeholders.city')}
                     placeholderTextColor="#666"
                   />
                 </View>
@@ -261,12 +267,12 @@ export default function CheckoutScreen() {
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Instructions spéciales</Text>
+              <Text style={styles.label}>{t('checkout.form.instructions')}</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={specialInstructions}
                 onChangeText={setSpecialInstructions}
-                placeholder="Allergies, code porte, etc."
+                placeholder={t('checkout.form.placeholders.instructions')}
                 placeholderTextColor="#666"
                 multiline
                 numberOfLines={3}
@@ -276,22 +282,22 @@ export default function CheckoutScreen() {
 
           {/* Résumé */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Résumé</Text>
+            <Text style={styles.sectionTitle}>{t('checkout.summary.title')}</Text>
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Sous-total</Text>
+              <Text style={styles.summaryLabel}>{t('checkout.summary.subtotal')}</Text>
               <Text style={styles.summaryValue}>{subtotal.toFixed(0)} FCFA</Text>
             </View>
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Frais de livraison</Text>
+              <Text style={styles.summaryLabel}>{t('checkout.summary.deliveryFee')}</Text>
               <Text style={styles.summaryValue}>
-                {deliveryFee === 0 ? 'Gratuit' : `${deliveryFee} FCFA`}
+                {deliveryFee === 0 ? t('checkout.summary.free') : `${deliveryFee} FCFA`}
               </Text>
             </View>
 
             <View style={[styles.summaryRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Total à payer</Text>
+              <Text style={styles.totalLabel}>{t('checkout.summary.total')}</Text>
               <Text style={styles.totalValue}>{total.toFixed(0)} FCFA</Text>
             </View>
           </View>
@@ -310,7 +316,7 @@ export default function CheckoutScreen() {
             <ActivityIndicator color="white" />
           ) : (
             <Text style={styles.payButtonText}>
-              Confirmer la commande - {total.toFixed(0)} FCFA
+              {t('checkout.submit')} - {total.toFixed(0)} FCFA
             </Text>
           )}
         </TouchableOpacity>

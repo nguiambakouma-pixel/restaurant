@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../components/ui/BackButton';
@@ -12,6 +13,7 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadOrders();
@@ -32,7 +34,7 @@ export default function OrdersScreen() {
       }
     } catch (error) {
       console.error('Erreur chargement commandes:', error);
-      Alert.alert('Erreur', 'Impossible de charger vos commandes');
+      Alert.alert(t('common.error'), t('orders.alerts.loadError'));
     } finally {
       setLoading(false);
     }
@@ -46,13 +48,13 @@ export default function OrdersScreen() {
 
   const getStatusLabel = (status: string) => {
     const statusLabels: { [key: string]: string } = {
-      pending: '⏳ En attente',
-      confirmed: '✅ Confirmée',
-      preparing: '👨‍🍳 En préparation',
-      ready: '🎉 Prête',
-      delivering: '🚚 En livraison',
-      completed: '✓ Livrée',
-      cancelled: '✕ Annulée',
+      pending: `⏳ ${t('orders.status.pending')}`,
+      confirmed: `✅ ${t('orders.status.confirmed')}`,
+      preparing: `👨‍🍳 ${t('orders.status.preparing')}`,
+      ready: `🎉 ${t('orders.status.ready')}`,
+      delivering: `🚚 ${t('orders.status.delivering')}`,
+      completed: `✓ ${t('orders.status.completed')}`,
+      cancelled: `✕ ${t('orders.status.cancelled')}`,
     };
     return statusLabels[status] || status;
   };
@@ -83,22 +85,22 @@ export default function OrdersScreen() {
 
   const handleCancelOrder = (orderId: string) => {
     Alert.alert(
-      'Annuler la commande',
-      'Voulez-vous vraiment annuler cette commande ?',
+      t('orders.alerts.cancelTitle'),
+      t('orders.alerts.cancelText'),
       [
-        { text: 'Non', style: 'cancel' },
+        { text: t('common.no'), style: 'cancel' },
         {
-          text: 'Oui, annuler',
+          text: t('orders.alerts.confirmCancel'),
           style: 'destructive',
           onPress: async () => {
             try {
               const { success, error } = await ordersService.cancelOrder(orderId);
               if (error) throw error;
 
-              Alert.alert('Succès', 'Commande annulée');
+              Alert.alert(t('common.success'), t('orders.alerts.cancelSuccess'));
               loadOrders();
             } catch (error) {
-              Alert.alert('Erreur', 'Impossible d\'annuler la commande');
+              Alert.alert(t('common.error'), t('orders.alerts.cancelError'));
             }
           },
         },
@@ -111,15 +113,15 @@ export default function OrdersScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <BackButton style={styles.backButton} />
-          <Text style={styles.headerTitle}>Mes Commandes</Text>
+          <Text style={styles.headerTitle}>{t('orders.title')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>📦</Text>
-          <Text style={styles.emptyTitle}>Connectez-vous</Text>
+          <Text style={styles.emptyTitle}>{t('orders.loginRequired.title')}</Text>
           <Text style={styles.emptyText}>
-            Pour voir vos commandes, vous devez être connecté
+            {t('orders.loginRequired.text')}
           </Text>
 
           <TouchableOpacity
@@ -127,7 +129,7 @@ export default function OrdersScreen() {
             onPress={() => router.push('/login')}
             activeOpacity={0.8}
           >
-            <Text style={styles.loginButtonText}>Se connecter</Text>
+            <Text style={styles.loginButtonText}>{t('orders.loginRequired.button')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -139,12 +141,12 @@ export default function OrdersScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <BackButton style={styles.backButton} />
-          <Text style={styles.headerTitle}>Mes Commandes</Text>
+          <Text style={styles.headerTitle}>{t('orders.title')}</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#ff6b35" />
-          <Text style={styles.loadingText}>Chargement...</Text>
+          <Text style={styles.loadingText}>{t('common.loading')}</Text>
         </View>
       </View>
     );
@@ -155,15 +157,15 @@ export default function OrdersScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <BackButton style={styles.backButton} />
-          <Text style={styles.headerTitle}>Mes Commandes</Text>
+          <Text style={styles.headerTitle}>{t('orders.title')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>📦</Text>
-          <Text style={styles.emptyTitle}>Aucune commande</Text>
+          <Text style={styles.emptyTitle}>{t('orders.empty.title')}</Text>
           <Text style={styles.emptyText}>
-            Vous n'avez pas encore passé de commande
+            {t('orders.empty.text')}
           </Text>
 
           <TouchableOpacity
@@ -171,7 +173,7 @@ export default function OrdersScreen() {
             onPress={() => router.push('/explore')}
             activeOpacity={0.8}
           >
-            <Text style={styles.browseButtonText}>Parcourir le menu</Text>
+            <Text style={styles.browseButtonText}>{t('orders.empty.button')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -182,13 +184,13 @@ export default function OrdersScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <BackButton style={styles.backButton} />
-        <Text style={styles.headerTitle}>Mes Commandes</Text>
+        <Text style={styles.headerTitle}>{t('orders.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.statsBar}>
         <Text style={styles.statsText}>
-          {orders.length} commande{orders.length > 1 ? 's' : ''}
+          {orders.length} {t('orders.count')}
         </Text>
       </View>
 
@@ -210,7 +212,7 @@ export default function OrdersScreen() {
             <View style={styles.orderHeader}>
               <View>
                 <Text style={styles.orderNumber}>
-                  Commande #{order.id.slice(0, 8)}
+                  {t('orders.orderNumber')}{order.id.slice(0, 8)}
                 </Text>
                 <Text style={styles.orderDate}>
                   {formatDate(order.created_at)}
@@ -254,7 +256,7 @@ export default function OrdersScreen() {
 
               {order.order_items.length > 3 && (
                 <Text style={styles.moreItems}>
-                  +{order.order_items.length - 3} autre(s) article(s)
+                  +{order.order_items.length - 3} {t('orders.moreItems')}
                 </Text>
               )}
             </View>
@@ -264,7 +266,7 @@ export default function OrdersScreen() {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>
                   {order.delivery_mode === 'delivery' ? '📦' : '🏪'}{' '}
-                  {order.delivery_mode === 'delivery' ? 'Livraison' : 'Retrait'}
+                  {order.delivery_mode === 'delivery' ? t('orders.delivery') : t('orders.pickup')}
                 </Text>
                 {order.delivery_mode === 'delivery' && order.customer_address && (
                   <Text style={styles.detailValue} numberOfLines={1}>
@@ -274,7 +276,7 @@ export default function OrdersScreen() {
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Total</Text>
+                <Text style={styles.detailLabel}>{t('orders.total')}</Text>
                 <Text style={styles.totalValue}>{order.total.toFixed(0)} FCFA</Text>
               </View>
             </View>
@@ -287,7 +289,7 @@ export default function OrdersScreen() {
                   onPress={() => handleCancelOrder(order.id)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                  <Text style={styles.cancelButtonText}>{t('orders.actions.cancel')}</Text>
                 </TouchableOpacity>
               )}
 
@@ -295,11 +297,11 @@ export default function OrdersScreen() {
                 <TouchableOpacity
                   style={styles.reorderButton}
                   onPress={() => {
-                    Alert.alert('Bientôt', 'La fonction "Commander à nouveau" arrive bientôt !');
+                    Alert.alert(t('orders.alerts.comingSoon'));
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.reorderButtonText}>Commander à nouveau</Text>
+                  <Text style={styles.reorderButtonText}>{t('orders.actions.reorder')}</Text>
                 </TouchableOpacity>
               )}
             </View>

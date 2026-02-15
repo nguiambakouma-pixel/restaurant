@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
 
@@ -55,17 +56,7 @@ export default function FavoritesScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Mes Favoris</Text>
-          <Text style={styles.headerSubtitle}>Chargement...</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff6b35" />
-        </View>
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   if (favorites.length === 0) {

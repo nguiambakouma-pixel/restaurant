@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -12,6 +12,7 @@ import {
   View
 } from 'react-native';
 import AddReviewModal from '../../../components/AddReviewModal';
+import LoadingScreen from '../../../components/ui/LoadingScreen';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useFavorites } from '../../context/FavoritesContext';
@@ -58,11 +59,12 @@ interface Category {
 }
 
 export default function ProductDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const { user } = useAuth();
   const { addToCart } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
-  
+
   const [product, setProduct] = useState<Product | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -71,7 +73,7 @@ export default function ProductDetailScreen() {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [activeTab, setActiveTab] = useState<'ingredients' | 'reviews'>('ingredients');
   const [showReviewModal, setShowReviewModal] = useState(false);
-  
+
   const scrollY = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -110,7 +112,7 @@ export default function ProductDetailScreen() {
           .select('name, emoji')
           .eq('id', productData.category_id)
           .single();
-        
+
         if (categoryData) setCategory(categoryData);
       }
 
@@ -131,7 +133,7 @@ export default function ProductDetailScreen() {
 
     } catch (error: any) {
       console.error('Erreur chargement produit:', error);
-      Alert.alert('Erreur', 'Impossible de charger les détails du produit');
+      Alert.alert(t('common.error'), t('product.alerts.loadError'));
     } finally {
       setLoading(false);
     }
@@ -145,18 +147,18 @@ export default function ProductDetailScreen() {
         id: parseInt(product.id),
         name: product.name,
         price: product.price,
-        image: product.image_url 
+        image: product.image_url
           ? { uri: product.image_url }
           : require('../../../assets/images/hero.jpeg'),
       });
     }
-    
+
     Alert.alert(
-      'Ajouté au panier !',
-      `${quantity} x ${product.name} ajouté${quantity > 1 ? 's' : ''} au panier`,
+      t('product.alerts.addedTitle'),
+      t('product.alerts.addedText', { quantity, name: product.name }),
       [
-        { text: 'Continuer', style: 'cancel' },
-        { text: 'Voir le panier', onPress: () => router.push('/cart') }
+        { text: t('common.continue'), style: 'cancel' },
+        { text: t('product.alerts.viewCart'), onPress: () => router.push('/cart') }
       ]
     );
   };
@@ -167,12 +169,12 @@ export default function ProductDetailScreen() {
     // Vérifier si l'utilisateur est connecté
     if (!user) {
       Alert.alert(
-        'Connexion requise',
-        'Vous devez être connecté pour ajouter des plats en favoris',
+        t('product.alerts.loginRequired'),
+        t('product.alerts.loginText'),
         [
-          { text: 'Annuler', style: 'cancel' },
-          { 
-            text: 'Se connecter', 
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('product.alerts.loginButton'),
             onPress: () => router.push('/login')
           }
         ]
@@ -191,18 +193,18 @@ export default function ProductDetailScreen() {
     } catch (error: any) {
       if (error.message === 'CONNEXION_REQUISE') {
         Alert.alert(
-          'Connexion requise',
-          'Vous devez être connecté pour ajouter des plats en favoris',
+          t('product.alerts.loginRequired'),
+          t('product.alerts.loginText'),
           [
-            { text: 'Annuler', style: 'cancel' },
-            { 
-              text: 'Se connecter', 
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('product.alerts.loginButton'),
               onPress: () => router.push('/login')
             }
           ]
         );
       } else {
-        Alert.alert('Erreur', 'Impossible de modifier les favoris');
+        Alert.alert(t('common.error'), t('product.alerts.favoriteError'));
       }
     }
   };
@@ -221,22 +223,15 @@ export default function ProductDetailScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff6b35" />
-          <Text style={styles.loadingText}>Chargement...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   if (!product) {
@@ -244,13 +239,13 @@ export default function ProductDetailScreen() {
       <View style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorEmoji}>😕</Text>
-          <Text style={styles.errorText}>Produit introuvable</Text>
+          <Text style={styles.errorText}>{t('product.alerts.notFound')}</Text>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
             activeOpacity={0.8}
           >
-            <Text style={styles.backButtonText}>Retour au menu</Text>
+            <Text style={styles.backButtonText}>{t('product.alerts.backToMenu')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -297,16 +292,16 @@ export default function ProductDetailScreen() {
       >
         {/* Image hero */}
         <View style={styles.imageContainer}>
-          <Image 
+          <Image
             source={
-              product.image_url 
+              product.image_url
                 ? { uri: product.image_url }
                 : require('../../../assets/images/hero.jpeg')
             }
             style={styles.heroImage}
             defaultSource={require('../../../assets/images/hero.jpeg')}
           />
-          
+
           {/* Boutons overlay sur l'image */}
           <View style={styles.imageOverlay}>
             <TouchableOpacity
@@ -316,7 +311,7 @@ export default function ProductDetailScreen() {
             >
               <Text style={styles.backButtonOverlayText}>←</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={styles.favoriteButton}
               onPress={handleToggleFavorite}
@@ -332,17 +327,17 @@ export default function ProductDetailScreen() {
           <View style={styles.badgeContainer}>
             {product.is_vegetarian && (
               <View style={[styles.badge, styles.badgeVegetarian]}>
-                <Text style={styles.badgeText}>🌱 Végétarien</Text>
+                <Text style={styles.badgeText}>🌱 {t('product.badges.vegetarian')}</Text>
               </View>
             )}
             {product.is_vegan && (
               <View style={[styles.badge, styles.badgeVegan]}>
-                <Text style={styles.badgeText}>🌿 Vegan</Text>
+                <Text style={styles.badgeText}>🌿 {t('product.badges.vegan')}</Text>
               </View>
             )}
             {product.is_spicy && (
               <View style={[styles.badge, styles.badgeSpicy]}>
-                <Text style={styles.badgeText}>🌶️ Épicé</Text>
+                <Text style={styles.badgeText}>🌶️ {t('product.badges.spicy')}</Text>
               </View>
             )}
           </View>
@@ -357,7 +352,7 @@ export default function ProductDetailScreen() {
                 {category?.emoji} {category?.name || 'Produit'}
               </Text>
               <Text style={styles.productName}>{product.name}</Text>
-              
+
               {/* Note et avis */}
               {product.rating_count > 0 && (
                 <View style={styles.ratingContainer}>
@@ -382,23 +377,23 @@ export default function ProductDetailScreen() {
             {product.preparation_time && (
               <View style={styles.infoCard}>
                 <Text style={styles.infoIcon}>⏱️</Text>
-                <Text style={styles.infoLabel}>Préparation</Text>
+                <Text style={styles.infoLabel}>{t('product.preparation')}</Text>
                 <Text style={styles.infoValue}>{product.preparation_time} min</Text>
               </View>
             )}
-            
+
             {product.calories && (
               <View style={styles.infoCard}>
                 <Text style={styles.infoIcon}>🔥</Text>
-                <Text style={styles.infoLabel}>Calories</Text>
+                <Text style={styles.infoLabel}>{t('product.calories')}</Text>
                 <Text style={styles.infoValue}>{product.calories} kcal</Text>
               </View>
             )}
-            
+
             {product.rating_count > 0 && (
               <View style={styles.infoCard}>
                 <Text style={styles.infoIcon}>👨‍🍳</Text>
-                <Text style={styles.infoLabel}>Note</Text>
+                <Text style={styles.infoLabel}>{t('product.rating')}</Text>
                 <Text style={styles.infoValue}>{product.rating_avg.toFixed(1)}/5</Text>
               </View>
             )}
@@ -407,8 +402,8 @@ export default function ProductDetailScreen() {
           {/* Description */}
           {product.description && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text 
+              <Text style={styles.sectionTitle}>{t('product.description')}</Text>
+              <Text
                 style={styles.description}
                 numberOfLines={showFullDescription ? undefined : 4}
               >
@@ -420,7 +415,7 @@ export default function ProductDetailScreen() {
                   activeOpacity={0.8}
                 >
                   <Text style={styles.readMore}>
-                    {showFullDescription ? 'Voir moins' : 'Lire plus'}
+                    {showFullDescription ? t('product.seeLess') : t('product.readMore')}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -435,17 +430,17 @@ export default function ProductDetailScreen() {
               activeOpacity={0.8}
             >
               <Text style={[styles.tabText, activeTab === 'ingredients' && styles.activeTabText]}>
-                Ingrédients
+                {t('product.ingredients')}
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
               onPress={() => setActiveTab('reviews')}
               activeOpacity={0.8}
             >
               <Text style={[styles.tabText, activeTab === 'reviews' && styles.activeTabText]}>
-                Avis ({product.rating_count})
+                {t('product.reviews')} ({product.rating_count})
               </Text>
             </TouchableOpacity>
           </View>
@@ -463,13 +458,13 @@ export default function ProductDetailScreen() {
                   ))}
                 </View>
               ) : (
-                <Text style={styles.noDataText}>Aucun ingrédient spécifié</Text>
+                <Text style={styles.noDataText}>{t('product.noIngredients')}</Text>
               )}
 
               {/* Allergènes */}
               {product.allergens && product.allergens.length > 0 && (
                 <View style={styles.allergensSection}>
-                  <Text style={styles.allergensTitle}>⚠️ Allergènes</Text>
+                  <Text style={styles.allergensTitle}>⚠️ {t('product.allergens')}</Text>
                   <View style={styles.allergensList}>
                     {product.allergens.map((allergen, index) => (
                       <View key={index} style={styles.allergenTag}>
@@ -509,20 +504,20 @@ export default function ProductDetailScreen() {
                 <View style={styles.noReviewsContainer}>
                   <Text style={styles.noReviewsEmoji}>💭</Text>
                   <Text style={styles.noReviewsText}>
-                    Aucun avis pour le moment
+                    {t('product.noReviews')}
                   </Text>
                   <Text style={styles.noReviewsSubtext}>
-                    Soyez le premier à donner votre avis !
+                    {t('product.beFirst')}
                   </Text>
                 </View>
               )}
-              
+
               <TouchableOpacity
                 style={styles.addReviewButton}
                 onPress={() => setShowReviewModal(true)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.addReviewButtonText}>+ Ajouter un avis</Text>
+                <Text style={styles.addReviewButtonText}>+ {t('product.addReview')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -534,7 +529,7 @@ export default function ProductDetailScreen() {
       {/* Footer avec quantité et bouton */}
       <View style={styles.footer}>
         <View style={styles.quantitySection}>
-          <Text style={styles.quantityLabel}>Quantité</Text>
+          <Text style={styles.quantityLabel}>{t('product.quantity')}</Text>
           <View style={styles.quantityControls}>
             <TouchableOpacity
               style={styles.quantityButton}
@@ -543,9 +538,9 @@ export default function ProductDetailScreen() {
             >
               <Text style={styles.quantityButtonText}>-</Text>
             </TouchableOpacity>
-            
+
             <Text style={styles.quantityValue}>{quantity}</Text>
-            
+
             <TouchableOpacity
               style={styles.quantityButton}
               onPress={() => setQuantity(quantity + 1)}
@@ -563,9 +558,9 @@ export default function ProductDetailScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.addToCartButtonText}>
-            {product.is_available 
-              ? `Ajouter - ${(product.price * quantity).toFixed(0)} FCFA`
-              : 'Indisponible'
+            {product.is_available
+              ? `${t('common.add')} - ${(product.price * quantity).toFixed(0)} FCFA`
+              : t('product.unavailable')
             }
           </Text>
         </TouchableOpacity>

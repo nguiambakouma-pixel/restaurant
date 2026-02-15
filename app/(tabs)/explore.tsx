@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { supabase } from '../lib/supabase';
 
@@ -96,18 +98,7 @@ export default function MenuScreen() {
   });
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Notre Menu</Text>
-          <Text style={styles.headerSubtitle}>Chargement...</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff6b35" />
-          <Text style={styles.loadingText}>Chargement du menu...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   return (

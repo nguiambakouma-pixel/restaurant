@@ -1,30 +1,50 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { supabase } from '../lib/supabase';
 
+import loyaltyService from '../services/loyaltyService';
+
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { user, signOut, loading } = useAuth();
   const { getFavoritesCount } = useFavorites();
   const { getTotalItems } = useCart();
+
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [loyaltyLevel, setLoyaltyLevel] = useState('bronze');
   const [stats, setStats] = useState({
     totalOrders: 0,
     totalSpent: 0,
   });
   const [isAdmin, setIsAdmin] = useState(false);
 
-
   useEffect(() => {
     if (user) {
+      loadLoyaltyInfo();
       loadUserStats();
       checkAdminStatus();
     }
   }, [user]);
+
+  const loadLoyaltyInfo = async () => {
+    try {
+      const { data } = await loyaltyService.getLoyaltyPoints(user!.id);
+      if (data) {
+        setLoyaltyPoints(data.points);
+        setLoyaltyLevel(data.level);
+      }
+    } catch (error) {
+      console.error('Erreur chargement fidélité:', error);
+    }
+  };
 
   const checkAdminStatus = async () => {
     try {
@@ -64,16 +84,16 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      t('profile.alerts.logoutTitle'),
+      t('profile.alerts.logoutText'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Déconnexion',
+          text: t('profile.logout'),
           style: 'destructive',
           onPress: async () => {
             await signOut();
-            Alert.alert('À bientôt !', 'Vous avez été déconnecté avec succès');
+            Alert.alert(t('profile.alerts.logoutSuccessTitle'), t('profile.alerts.logoutSuccessText'));
           }
         }
       ]
@@ -90,17 +110,7 @@ export default function ProfileScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-          <Text style={styles.headerTitle}>Mon Profil</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff6b35" />
-          <Text style={styles.loadingText}>Chargement...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   // Si l'utilisateur n'est pas connecté (MODE INVITÉ)
@@ -112,8 +122,8 @@ export default function ProfileScreen() {
           <View style={styles.guestBadge}>
             <Text style={styles.guestBadgeIcon}>👤</Text>
           </View>
-          <Text style={styles.headerTitle}>Mode Invité</Text>
-          <Text style={styles.headerSubtitle}>Connectez-vous pour plus de fonctionnalités</Text>
+          <Text style={styles.headerTitle}>{t('profile.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('profile.guest.badge')}</Text>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -122,21 +132,21 @@ export default function ProfileScreen() {
             <View style={styles.statCard}>
               <Text style={styles.statIcon}>🛒</Text>
               <Text style={styles.statValue}>{getTotalItems()}</Text>
-              <Text style={styles.statLabel}>Articles au panier</Text>
+              <Text style={styles.statLabel}>{t('profile.stats.cart')}</Text>
             </View>
 
             <View style={styles.statCard}>
               <Text style={styles.statIcon}>🍽️</Text>
               <Text style={styles.statValue}>0</Text>
-              <Text style={styles.statLabel}>Commandes</Text>
+              <Text style={styles.statLabel}>{t('profile.stats.orders')}</Text>
             </View>
           </View>
 
           {/* Message invité */}
           <View style={styles.guestContainer}>
-            <Text style={styles.guestTitle}>Créez votre compte</Text>
+            <Text style={styles.guestTitle}>{t('profile.guest.title')}</Text>
             <Text style={styles.guestText}>
-              Profitez de tous les avantages : favoris, historique, livraison et plus encore !
+              {t('profile.guest.text')}
             </Text>
 
             <TouchableOpacity
@@ -144,7 +154,7 @@ export default function ProfileScreen() {
               onPress={() => router.push('/login')}
               activeOpacity={0.8}
             >
-              <Text style={styles.primaryButtonText}>Se connecter</Text>
+              <Text style={styles.primaryButtonText}>{t('profile.guest.login')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -152,38 +162,39 @@ export default function ProfileScreen() {
               onPress={() => router.push('/register')}
               activeOpacity={0.8}
             >
-              <Text style={styles.secondaryButtonText}>Créer un compte</Text>
+              <Text style={styles.secondaryButtonText}>{t('profile.guest.register')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Fonctionnalités disponibles */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Avec un compte</Text>
+            <Text style={styles.sectionTitle}>{t('profile.features.title')}</Text>
             <View style={styles.featureCard}>
               <Text style={styles.featureIcon}>❤️</Text>
               <View style={styles.featureInfo}>
-                <Text style={styles.featureTitle}>Plats favoris</Text>
-                <Text style={styles.featureDesc}>Sauvegardez vos plats préférés</Text>
+                <Text style={styles.featureTitle}>{t('profile.features.favorites.title')}</Text>
+                <Text style={styles.featureDesc}>{t('profile.features.favorites.desc')}</Text>
               </View>
             </View>
             <View style={styles.featureCard}>
               <Text style={styles.featureIcon}>📦</Text>
               <View style={styles.featureInfo}>
-                <Text style={styles.featureTitle}>Livraison à domicile</Text>
-                <Text style={styles.featureDesc}>Commandez et faites-vous livrer</Text>
+                <Text style={styles.featureTitle}>{t('profile.features.delivery.title')}</Text>
+                <Text style={styles.featureDesc}>{t('profile.features.delivery.desc')}</Text>
               </View>
             </View>
             <View style={styles.featureCard}>
               <Text style={styles.featureIcon}>📋</Text>
               <View style={styles.featureInfo}>
-                <Text style={styles.featureTitle}>Historique des commandes</Text>
-                <Text style={styles.featureDesc}>Suivez toutes vos commandes</Text>
+                <Text style={styles.featureTitle}>{t('profile.features.history.title')}</Text>
+                <Text style={styles.featureDesc}>{t('profile.features.history.desc')}</Text>
               </View>
             </View>
           </View>
         </ScrollView>
       </View>
     );
+
   }
 
   // Si l'utilisateur est connecté (DASHBOARD)
@@ -211,25 +222,25 @@ export default function ProfileScreen() {
           <View style={styles.statCard}>
             <Text style={styles.statIcon}>❤️</Text>
             <Text style={styles.statValue}>{getFavoritesCount()}</Text>
-            <Text style={styles.statLabel}>Favoris</Text>
+            <Text style={styles.statLabel}>{t('profile.stats.favorites')}</Text>
           </View>
 
           <View style={styles.statCard}>
             <Text style={styles.statIcon}>📦</Text>
             <Text style={styles.statValue}>{stats.totalOrders}</Text>
-            <Text style={styles.statLabel}>Commandes</Text>
+            <Text style={styles.statLabel}>{t('profile.stats.orders')}</Text>
           </View>
 
           <View style={styles.statCard}>
             <Text style={styles.statIcon}>🛒</Text>
             <Text style={styles.statValue}>{getTotalItems()}</Text>
-            <Text style={styles.statLabel}>Au panier</Text>
+            <Text style={styles.statLabel}>{t('profile.stats.inCart')}</Text>
           </View>
         </View>
 
         {/* Accès rapide */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Accès rapide</Text>
+          <Text style={styles.sectionTitle}>{t('profile.menu.quickAccess')}</Text>
 
           <TouchableOpacity
             style={styles.menuItem}
@@ -238,8 +249,8 @@ export default function ProfileScreen() {
           >
             <Text style={styles.menuIcon}>❤️</Text>
             <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>Mes favoris</Text>
-              <Text style={styles.menuDesc}>{getFavoritesCount()} plat(s) sauvegardé(s)</Text>
+              <Text style={styles.menuTitle}>{t('profile.menu.myFavorites')}</Text>
+              <Text style={styles.menuDesc}>{getFavoritesCount()} {t('profile.menu.savedDishes')}</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
@@ -251,8 +262,8 @@ export default function ProfileScreen() {
           >
             <Text style={styles.menuIcon}>📦</Text>
             <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>Mes commandes</Text>
-              <Text style={styles.menuDesc}>{stats.totalOrders} commande(s)</Text>
+              <Text style={styles.menuTitle}>{t('profile.menu.myOrders')}</Text>
+              <Text style={styles.menuDesc}>{stats.totalOrders} {t('orders.count')}</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
@@ -264,8 +275,8 @@ export default function ProfileScreen() {
           >
             <Text style={styles.menuIcon}>🛒</Text>
             <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>Mon panier</Text>
-              <Text style={styles.menuDesc}>{getTotalItems()} article(s)</Text>
+              <Text style={styles.menuTitle}>{t('profile.menu.myCart')}</Text>
+              <Text style={styles.menuDesc}>{getTotalItems()} {t('cart.items')}</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
@@ -273,7 +284,20 @@ export default function ProfileScreen() {
 
         {/* Paramètres */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Compte</Text>
+          <Text style={styles.sectionTitle}>{t('profile.settings')}</Text>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/settings')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuIcon}>⚙️</Text>
+            <View style={styles.menuInfo}>
+              <Text style={styles.menuTitle}>{t('profile.settings')}</Text>
+              <Text style={styles.menuDesc}>{t('profile.language')}, etc.</Text>
+            </View>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
@@ -282,34 +306,21 @@ export default function ProfileScreen() {
           >
             <Text style={styles.menuIcon}>👤</Text>
             <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>Informations personnelles</Text>
-              <Text style={styles.menuDesc}>Nom, email, téléphone</Text>
+              <Text style={styles.menuTitle}>{t('profile.menu.personalInfo')}</Text>
+              <Text style={styles.menuDesc}>{t('profile.menu.personalInfoDesc')}</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => Alert.alert('Bientôt disponible', 'La gestion des adresses arrive bientôt !')}
+            onPress={() => Alert.alert(t('common.info'), t('profile.alerts.addressesComingSoon'))}
             activeOpacity={0.8}
           >
             <Text style={styles.menuIcon}>📍</Text>
             <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>Mes adresses</Text>
-              <Text style={styles.menuDesc}>Gérer les adresses de livraison</Text>
-            </View>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => Alert.alert('Bientôt disponible', 'Les paramètres arrivent bientôt !')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.menuIcon}>⚙️</Text>
-            <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>Paramètres</Text>
-              <Text style={styles.menuDesc}>Préférences et notifications</Text>
+              <Text style={styles.menuTitle}>{t('profile.menu.myAddresses')}</Text>
+              <Text style={styles.menuDesc}>{t('profile.menu.addressesDesc')}</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
@@ -317,29 +328,29 @@ export default function ProfileScreen() {
 
         {/* Aide */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Aide</Text>
+          <Text style={styles.sectionTitle}>{t('profile.menu.help')}</Text>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => Alert.alert('Support', 'Contactez-nous :\nsupport@bistromoderne.com\n+237 6 XX XX XX XX')}
+            onPress={() => Alert.alert(t('profile.menu.support'), t('profile.alerts.supportContent'))}
             activeOpacity={0.8}
           >
             <Text style={styles.menuIcon}>💬</Text>
             <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>Support</Text>
-              <Text style={styles.menuDesc}>Besoin d'aide ?</Text>
+              <Text style={styles.menuTitle}>{t('profile.menu.support')}</Text>
+              <Text style={styles.menuDesc}>{t('profile.menu.supportDesc')}</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => Alert.alert('À propos', 'Bistro Moderne v1.0\nDéveloppé avec ❤️ au Cameroun')}
+            onPress={() => Alert.alert(t('profile.menu.about'), t('profile.alerts.aboutContent'))}
             activeOpacity={0.8}
           >
             <Text style={styles.menuIcon}>ℹ️</Text>
             <View style={styles.menuInfo}>
-              <Text style={styles.menuTitle}>À propos</Text>
-              <Text style={styles.menuDesc}>Version et informations</Text>
+              <Text style={styles.menuTitle}>{t('profile.menu.about')}</Text>
+              <Text style={styles.menuDesc}>{t('profile.menu.aboutDesc')}</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
@@ -348,23 +359,25 @@ export default function ProfileScreen() {
 
         {/* Section Admin - Visible seulement pour les admins */}
         {/* Section Admin - Visible seulement pour les admins */}
-        {user && isAdmin && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Administration</Text>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/admin')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.menuIcon}>⚙️</Text>
-              <View style={styles.menuInfo}>
-                <Text style={styles.menuTitle}>Dashboard Admin</Text>
-                <Text style={styles.menuDesc}>Accès administrateur</Text>
-              </View>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {
+          user && isAdmin && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('profile.menu.admin')}</Text>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => router.push('/admin')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.menuIcon}>⚙️</Text>
+                <View style={styles.menuInfo}>
+                  <Text style={styles.menuTitle}>{t('profile.menu.adminDashboard')}</Text>
+                  <Text style={styles.menuDesc}>{t('profile.menu.adminDesc')}</Text>
+                </View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }
 
         {/* ============ FIN DU CODE À AJOUTER ============ */}
 
@@ -375,13 +388,13 @@ export default function ProfileScreen() {
             onPress={handleLogout}
             activeOpacity={0.8}
           >
-            <Text style={styles.logoutButtonText}>🚪 Déconnexion</Text>
+            <Text style={styles.logoutButtonText}>🚪 {t('profile.logout')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={{ height: 40 }} />
-      </ScrollView>
-    </View>
+      </ScrollView >
+    </View >
   );
 }
 
